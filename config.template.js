@@ -1,0 +1,46 @@
+// ============================================================
+// RIG CHURCH LAGOS — NEXT STEPS · CONFIGURATION (TEMPLATE)
+// This is the git-tracked template. SUPABASE_URL and SUPABASE_ANON_KEY
+// stay as placeholders here per CLAUDE.md ("real keys are never
+// committed") — the deploy workflow fills them in from GitHub secrets
+// at deploy time, into a config.js that is never committed.
+//
+// For local development, copy this file to config.js and fill in the
+// two Supabase placeholders yourself (see supabase project settings > API).
+// ============================================================
+window.RIG_CONFIG = {
+  SUPABASE_URL: "https://YOUR-PROJECT-REF.supabase.co",
+  SUPABASE_ANON_KEY: "PASTE-YOUR-ANON-PUBLIC-KEY-HERE",
+
+  // Shown in the app and used for the QR code on the TV.
+  // TEMPORARY: using a hostingersite.com placeholder until nextsteps.rigchurchlagos.org
+  // is registered on Hostinger. Update this and re-deploy once the real subdomain is live.
+  CHECKIN_URL: "https://lightcyan-mosquito-333848.hostingersite.com",
+
+  CHURCH_NAME: "Rig Church Lagos",
+
+  // ---- PHASE 2 SETTINGS ----
+  // Your leader's WhatsApp number for the one-tap weekly report
+  // (e.g. "0803 000 0000"). Leave "" to pick the contact each time.
+  LEADER_WHATSAPP: "",
+
+  // Set to true ONLY after deploying the optional email-report add-on
+  // (see PHASE2-GUIDE). Emails the weekly report to leadership
+  // automatically when the director ends a session.
+  EMAIL_REPORTS: false,
+
+  // The four steps (from the Next Steps Director SOP).
+  // Paste each step's video link into "url" — YouTube (unlisted is fine)
+  // or Vimeo. It will play inside Session Mode on the TV.
+  STEPS: [
+    { n: 1, title: "Why God Put You on the Earth", video: "Session 1 — Encounter & Identity",              url: "" },
+    { n: 2, title: "The House You're Walking Into", video: "Session 2 — Vision, Mission & Values",         url: "https://youtu.be/ak45wQUWpTo" },
+    { n: 3, title: "Find Your Place",               video: "Session 3 — Gifts, Serving & Community",       url: "" },
+    { n: 4, title: "All In",                        video: "Session 4 — Covenant, Commitment & Commissioning", url: "" }
+  ],
+
+  // Follow-up message templates. [Name] and [Step] are filled in automatically.
+  MSG_ATTENDED: "Hi [Name], it was great meeting you today at Step [Step]. Really glad you came. Looking forward to seeing you next Sunday!",
+  MSG_COMPLETED: "[Name], congratulations on completing Next Steps! We're celebrating you. Someone from leadership will be in touch about what comes next.",
+  MSG_NOSHOW: "Hi [Name], it's the Next Steps team at RIG Church. Just wanted to check in and see how you're doing — we missed you this Sunday. No pressure, just wanted to connect."
+};

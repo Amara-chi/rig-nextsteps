@@ -1,0 +1,63 @@
+name: Deploy to Hostinger
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+env:
+  # Update this once nextsteps.rigchurchlagos.org is registered on Hostinger.
+  HOSTING_DOMAIN: lightcyan-mosquito-333848.hostingersite.com
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install Hostinger MCP server
+        run: npm install -g hostinger-hosting-mcp
+
+      - name: Install deploy-tool dependencies
+        run: npm install
+        working-directory: .github/deploy-tool
+
+      - name: Build real config.js from template + secrets
+        run: node .github/deploy-tool/build-config.mjs
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+
+      - name: Package static site
+        run: |
+          rm -rf /tmp/stage
+          mkdir -p /tmp/stage/admin
+          cp index.html config.js /tmp/stage/
+          cp admin/index.html /tmp/stage/admin/
+          cd /tmp/stage && zip -r /tmp/deploy.zip .
+
+      - name: Start Hostinger MCP server
+        run: |
+          HOSTINGER_API_TOKEN="${{ secrets.HOSTINGER_API_TOKEN }}" \
+            nohup hostinger-hosting-mcp --http --port 8100 > /tmp/mcp.log 2>&1 &
+          for i in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:8100/ -o /dev/null -w '%{http_code}' | grep -qE '^[0-9]+$'; then
+              echo "MCP server responding"
+              break
+            fi
+            sleep 1
+          done
+          cat /tmp/mcp.log || true
+
+      - name: Deploy static site to Hostinger
+        run: node .github/deploy-tool/deploy.mjs "$HOSTING_DOMAIN" /tmp/deploy.zip
+        env:
+          HOSTINGER_API_TOKEN: ${{ secrets.HOSTINGER_API_TOKEN }}
+
+      - name: Show MCP server log (on failure)
+        if: failure()
+        run: cat /tmp/mcp.log || true

@@ -1,0 +1,83 @@
+# Next Steps Platform — Phase 2 Upgrade
+### Rig Church Lagos · what's new and how to switch on
+
+Phase 2 is a **file replacement, not a rebuild**. Your database, your logins, and every record from Phase 1 stay exactly as they are. No SQL to run.
+
+---
+
+## What's new
+
+**In the app the moment you upload (no setup):**
+
+1. **Edit records in the app** — In People, the director now sees Edit details, Record a check-in (backfill a Sunday someone's phone missed), and Delete (for test entries and duplicates). No more going into Supabase to fix a typo'd phone number.
+2. **Membership countdown** — People who complete all 4 steps show a live "Membership window · Xd left" badge. When the 30 days pass, the badge turns green ("Ready ✓") and a **Welcome as member** button appears — with a reminder on screen that the public welcome is a leadership decision, per the SOP. Recording it stamps their "Member since" date.
+3. **Session videos on the TV** — Paste each step's YouTube or Vimeo link into `config.js` and the video plays inside Session Mode, right above the QR code. One screen runs the whole session.
+4. **One-tap follow-up** — "Send on WhatsApp" now opens the chat *and* logs it as sent in a single tap. Sunday-night follow-up for 10 people is now 10 taps.
+5. **Send the weekly report on WhatsApp** — A new button in Reports composes the five-point report as a WhatsApp message to your leader. Put your leader's number in `config.js` (`LEADER_WHATSAPP`) and it goes straight to their chat.
+
+**Optional automation add-ons (need one-time setup, instructions below):**
+
+6. **Auto-emailed weekly report** — the report emails itself to leadership the moment you end a session.
+7. **Fully automated WhatsApp follow-ups** — messages send themselves on a schedule through the official WhatsApp Business (Cloud) API, no tapping at all.
+
+---
+
+## Upgrading (10 minutes)
+
+1. **Update `config.js` — carefully.** Open the *new* `config.js` and paste in your two keys (`SUPABASE_URL` and `SUPABASE_ANON_KEY`) **from your current live `config.js`**. Then fill the new settings:
+   - `STEPS[..].url` — the video link for each step (YouTube unlisted links work well).
+   - `LEADER_WHATSAPP` — your leader's number, e.g. `"0803 000 0000"`.
+   - Leave `EMAIL_REPORTS: false` for now.
+2. **Upload** the new `admin/index.html` and your merged `config.js` to the subdomain folder in Hostinger File Manager, overwriting the old ones. `index.html` (the visitor form) is unchanged — no need to touch it.
+3. **Test:** open the admin app, go to People, tap a row — you should see the new edit buttons. Open Session Mode — if you added a video link, it plays.
+
+That's the whole upgrade. The add-ons below are optional and can be done any time.
+
+---
+
+## Add-on A — Auto-email the weekly report (~20 min)
+
+Uses **Resend** (resend.com), a simple email service with a free tier (100 emails/day — you need 1 a week).
+
+1. Create a free account at **resend.com** and get an **API key**. For the most professional result, verify your `rigchurchlagos.org` domain in Resend (they show you the DNS records to add in Hostinger → Domains → DNS); otherwise you can start immediately with their built-in sending address.
+2. Install the Supabase CLI on any computer (one-time): instructions at supabase.com/docs/guides/cli. Then in this project folder run:
+   ```
+   supabase login
+   supabase link --project-ref YOUR-PROJECT-REF
+   supabase functions deploy email-report
+   ```
+3. In Supabase → **Edge Functions → Secrets**, add:
+   - `RESEND_API_KEY` — from step 1
+   - `REPORT_FROM` — e.g. `Next Steps <nextsteps@rigchurchlagos.org>` (or Resend's default address)
+   - `REPORT_RECIPIENTS` — comma-separated leadership emails
+4. In `config.js`, set `EMAIL_REPORTS: true` and re-upload it.
+
+From then on, ending a session emails the report automatically. If the email ever fails, the app tells you and the report is still there to send manually.
+
+---
+
+## Add-on B — Fully automated WhatsApp follow-ups (~1–2 hrs, one-time)
+
+This is the "messages send themselves" upgrade. It uses Meta's **official WhatsApp Business (Cloud) API** — the compliant route; unofficial auto-senders risk the church's number being banned. It's more setup than Add-on A, so many churches happily stay with the one-tap flow. Honest picture of what's involved:
+
+1. **Meta setup:** create a Meta developer account (developers.facebook.com), create an app, add the **WhatsApp** product, and connect a phone number for the church (this number becomes API-only — use a dedicated number, not the director's personal one). Generate a **permanent access token** via a system user, and note the **Phone Number ID**.
+2. **Template approval:** business-initiated WhatsApp messages must use pre-approved templates. In WhatsApp Manager, create a template named `next_steps_followup`, language English, body:
+   > *Hi {{1}}, it was great meeting you today at Step {{2}}. Really glad you came. Looking forward to seeing you next Sunday!*
+   
+   Approval usually takes minutes to a day.
+3. **Deploy the function:**
+   ```
+   supabase functions deploy send-followups --no-verify-jwt
+   ```
+4. **Secrets** (Supabase → Edge Functions → Secrets): `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_ID`.
+5. **Schedule it:** in Supabase → **Edge Functions → send-followups → Schedules** (or Integrations → Cron), add a schedule of `0 17 * * 0` — that's every Sunday at 17:00 UTC = **6pm Lagos time**, after the service. Add a second run `0 8 * * 1` (Monday 9am Lagos) as a safety sweep.
+
+The function only auto-sends follow-ups created in the last 48 hours; anything it can't deliver stays visible in the app's Follow-Up queue for the human touch. Meta's free tier comfortably covers this volume (service conversations at this scale are effectively free; check current Meta pricing).
+
+**Costs:** Resend free tier — ₦0. WhatsApp Cloud API at your volume — effectively ₦0 to a few hundred naira monthly. Supabase — still free tier.
+
+---
+
+## A note on the SOP boundaries (unchanged)
+
+Even with Phase 2's new powers, the guardrails hold: leadership accounts still cannot edit anything (the database enforces it), house church *placement* still lives with the overseer, and "Welcome as member" only records what leadership has already decided — the button literally says so on screen.
