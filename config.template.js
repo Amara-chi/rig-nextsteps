@@ -8,6 +8,7 @@
 // For local development, copy this file to config.js and fill in the
 // two Supabase placeholders yourself (see supabase project settings > API).
 // ============================================================
+// Auto-deploy pipeline test: 2026-07-22.
 window.RIG_CONFIG = {
   SUPABASE_URL: "https://YOUR-PROJECT-REF.supabase.co",
   SUPABASE_ANON_KEY: "PASTE-YOUR-ANON-PUBLIC-KEY-HERE",
