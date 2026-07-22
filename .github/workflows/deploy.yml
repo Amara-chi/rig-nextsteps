@@ -20,7 +20,7 @@ jobs:
           node-version: 24
 
       - name: Install Hostinger MCP server
-        run: npm install -g hostinger-hosting-mcp
+        run: npm install -g hostinger-api-mcp
 
       - name: Install deploy-tool dependencies
         run: npm install
