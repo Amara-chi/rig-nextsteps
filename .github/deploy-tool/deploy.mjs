@@ -66,6 +66,8 @@ try {
   console.log("Deploy succeeded.");
 } catch (err) {
   console.error("Deploy failed:", err?.message || err);
+  if (err?.cause) console.error("Cause:", err.cause);
+  if (err?.stack) console.error(err.stack);
   process.exit(1);
 } finally {
   await client.close().catch(() => {});

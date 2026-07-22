@@ -44,14 +44,22 @@ jobs:
         run: |
           HOSTINGER_API_TOKEN="${{ secrets.HOSTINGER_API_TOKEN }}" \
             nohup hostinger-hosting-mcp --http --port 8100 > /tmp/mcp.log 2>&1 &
+          ready=false
           for i in $(seq 1 30); do
-            if curl -sf http://127.0.0.1:8100/ -o /dev/null -w '%{http_code}' | grep -qE '^[0-9]+$'; then
+            code=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8100/ || true)
+            echo "attempt $i: http_code=$code"
+            if [ "$code" != "000" ]; then
               echo "MCP server responding"
+              ready=true
               break
             fi
             sleep 1
           done
           cat /tmp/mcp.log || true
+          if [ "$ready" != "true" ]; then
+            echo "::error::MCP server never became ready"
+            exit 1
+          fi
 
       - name: Deploy static site to Hostinger
         run: node .github/deploy-tool/deploy.mjs "$HOSTING_DOMAIN" /tmp/deploy.zip
