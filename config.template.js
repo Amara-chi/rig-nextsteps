@@ -34,10 +34,10 @@ window.RIG_CONFIG = {
   // Paste each step's video link into "url" — YouTube (unlisted is fine)
   // or Vimeo. It will play inside Session Mode on the TV.
   STEPS: [
-    { n: 1, title: "Why God Put You on the Earth", video: "Session 1 — Encounter & Identity",              url: "" },
-    { n: 2, title: "The House You're Walking Into", video: "Session 2 — Vision, Mission & Values",         url: "https://youtu.be/ak45wQUWpTo" },
-    { n: 3, title: "Find Your Place",               video: "Session 3 — Gifts, Serving & Community",       url: "" },
-    { n: 4, title: "All In",                        video: "Session 4 — Covenant, Commitment & Commissioning", url: "" }
+    { n: 1, title: "Why God Put You on the Earth", video: "Session 1 — Encounter & Identity",              url: "https://youtu.be/ak45wQUWpTo" },
+    { n: 2, title: "The House You're Walking Into", video: "Session 2 — Vision, Mission & Values",         url: "https://youtu.be/A6-clb0SnvA" },
+    { n: 3, title: "Find Your Place",               video: "Session 3 — Gifts, Serving & Community",       url: "https://youtu.be/ZVNXobWbjL0" },
+    { n: 4, title: "All In",                        video: "Session 4 — Covenant, Commitment & Commissioning", url: "https://youtu.be/I4sA1zJiIPc" }
   ],
 
   // Follow-up message templates. [Name] and [Step] are filled in automatically.
