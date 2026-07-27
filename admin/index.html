@@ -181,6 +181,7 @@ tr.row-click:hover td{background:#FBF9F4}
 /* video player (Session Mode) */
 .video-embed{position:relative;aspect-ratio:16/9;border-radius:14px;overflow:hidden;background:var(--ink-deep);margin-bottom:16px}
 .video-embed iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+.video-embed video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#000}
 .video-hint{padding:12px 14px;border-radius:12px;background:var(--cream);border:1.5px dashed var(--line);font-size:12px;color:#7A8090;margin-bottom:16px}
 
 /* notes */
@@ -428,6 +429,9 @@ tr.row-click:hover td{background:#FBF9F4}
     if(m) return `https://player.vimeo.com/video/${m[1]}`;
     return url; // already an embed link
   }
+  function isDirectVideo(url){
+    return /\.(mp4|webm|ogv|ogg|mov|m4v)(\?.*)?$/i.test(url||"");
+  }
   let modalOnSave = null;
   function openModal(title, sub, bodyHTML, saveLabel, onSave){
     $("modal-title").textContent = title;
@@ -578,10 +582,12 @@ tr.row-click:hover td{background:#FBF9F4}
     if(live){
       $("sess-title").textContent = `Step ${openSession.step} — ${stepOf(openSession.step).title}`;
       $("sess-video").textContent = stepOf(openSession.step).video;
-      const vurl = toEmbed(stepOf(openSession.step).url);
-      $("sess-player").innerHTML = vurl
-        ? `<div class="video-embed"><iframe src="${vurl}" title="Session video" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe></div>`
-        : `<div class="video-hint">No video linked for this step yet. Add the YouTube or Vimeo link for Step ${openSession.step} in <b>config.js</b> and it will play right here.</div>`;
+      const rawUrl = stepOf(openSession.step).url;
+      $("sess-player").innerHTML = !rawUrl
+        ? `<div class="video-hint">No video linked for this step yet. Add a YouTube/Vimeo link, or a direct video file path (e.g. /videos/session-1.mp4), for Step ${openSession.step} in <b>config.js</b> and it will play right here.</div>`
+        : isDirectVideo(rawUrl)
+          ? `<div class="video-embed"><video src="${rawUrl}" controls autoplay playsinline></video></div>`
+          : `<div class="video-embed"><iframe src="${toEmbed(rawUrl)}" title="Session video" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe></div>`;
       $("qr-url").textContent = CFG.CHECKIN_URL;
       $("qrcode").innerHTML="";
       new QRCode($("qrcode"), { text: CFG.CHECKIN_URL, width: 200, height: 200, colorDark: "#F25125", colorLight: "#FFFFFF", correctLevel: QRCode.CorrectLevel.M });

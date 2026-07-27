@@ -31,8 +31,9 @@ window.RIG_CONFIG = {
   EMAIL_REPORTS: false,
 
   // The four steps (from the Next Steps Director SOP).
-  // Paste each step's video link into "url" — YouTube (unlisted is fine)
-  // or Vimeo. It will play inside Session Mode on the TV.
+  // Paste each step's video into "url" — YouTube (unlisted is fine), Vimeo,
+  // or a direct video file path (e.g. "/videos/session-1.mp4") if the file
+  // is hosted on this server instead. It will play inside Session Mode on the TV.
   STEPS: [
     { n: 1, title: "Why God Put You on the Earth", video: "Session 1 — Encounter & Identity",              url: "https://youtu.be/ak45wQUWpTo" },
     { n: 2, title: "The House You're Walking Into", video: "Session 2 — Vision, Mission & Values",         url: "https://youtu.be/A6-clb0SnvA" },
