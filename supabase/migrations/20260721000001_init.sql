@@ -25,10 +25,16 @@ $$;
 -- Staff accounts (created in Supabase Authentication).
 -- Every new login starts as read-only 'leader'; promote the
 -- director with the UPDATE statement at the bottom of this file.
+-- 'support' is a narrower role: it only sees people flagged for house
+-- church interest, the post-4-step membership pipeline, or an open
+-- follow-up (pending message, awaiting outcome, or a no-show) — see
+-- support_visible_person() below. It can add notes and log follow-up
+-- outcomes for exactly those people, and nothing else.
 create table public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   full_name text default '',
-  role text not null default 'leader' check (role in ('director','leader')),
+  email text,                           -- copied from auth.users at signup, for the Team roster
+  role text not null default 'leader' check (role in ('director','leader','support')),
   created_at timestamptz not null default now()
 );
 
@@ -80,8 +86,8 @@ create table public.followups (
 create or replace function public.handle_new_user()
 returns trigger language plpgsql security definer set search_path = public as $$
 begin
-  insert into public.profiles (id, full_name)
-  values (new.id, coalesce(new.raw_user_meta_data->>'full_name',''));
+  insert into public.profiles (id, full_name, email)
+  values (new.id, coalesce(new.raw_user_meta_data->>'full_name',''), new.email);
   return new;
 end $$;
 
@@ -90,10 +96,50 @@ create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_new_user();
 
--- ---------- Role check used by all security policies ----------
+-- ---------- Role checks used by all security policies ----------
 create or replace function public.is_director()
 returns boolean language sql stable security definer set search_path = public as $$
   select exists (select 1 from public.profiles where id = auth.uid() and role = 'director');
+$$;
+create or replace function public.is_leader()
+returns boolean language sql stable security definer set search_path = public as $$
+  select exists (select 1 from public.profiles where id = auth.uid() and role = 'leader');
+$$;
+create or replace function public.is_support()
+returns boolean language sql stable security definer set search_path = public as $$
+  select exists (select 1 from public.profiles where id = auth.uid() and role = 'support');
+$$;
+
+-- Support's visibility gate: true only for people flagged for house
+-- church interest, past all 4 steps (the membership pipeline, however
+-- far along), or with an open follow-up — a pending "attended" message,
+-- one sent but with no outcome logged yet, or a no-show (1-3 steps done,
+-- not seen since last Sunday). Mirrors the no-show rule in renderFollowUp()
+-- in index.html — keep the two in sync.
+create or replace function public.support_visible_person(p_id uuid)
+returns boolean language sql stable security definer set search_path = public as $$
+  select coalesce((
+    select
+      p.hc_interest
+      or p.member_since is not null
+      or coalesce(cs.steps_done, 0) = 4
+      or exists (
+        select 1 from public.followups f
+        where f.person_id = p.id and f.type = 'attended'
+        and (f.status = 'pending' or (f.status in ('sent','called','texted') and f.outcome is null))
+      )
+      or (
+        coalesce(cs.steps_done, 0) between 1 and 3
+        and cs.last_seen is not null
+        and cs.last_seen < (current_date - (extract(dow from current_date)::int))
+      )
+    from public.people p
+    left join (
+      select person_id, count(distinct step) as steps_done, max(checkin_date) as last_seen
+      from public.checkins where person_id = p_id group by person_id
+    ) cs on cs.person_id = p.id
+    where p.id = p_id
+  ), false);
 $$;
 
 -- Staff notes on people: action points, prayer points, notes for
@@ -107,10 +153,11 @@ create table public.person_notes (
   created_at timestamptz not null default now()
 );
 alter table public.person_notes enable row level security;
-create policy "staff read notes" on public.person_notes for select to authenticated using (true);
-create policy "staff add notes" on public.person_notes for insert to authenticated with check (author_id = auth.uid());
+create policy "staff read notes" on public.person_notes for select to authenticated using (public.is_director() or public.is_leader() or public.support_visible_person(person_id));
+create policy "staff add notes" on public.person_notes for insert to authenticated with check (author_id = auth.uid() and (public.is_director() or public.is_leader() or public.support_visible_person(person_id)));
+create policy "author or director edit notes" on public.person_notes for update to authenticated using (author_id = auth.uid() or public.is_director()) with check (author_id = auth.uid() or public.is_director());
 create policy "author or director delete notes" on public.person_notes for delete to authenticated using (author_id = auth.uid() or public.is_director());
-grant select, insert, delete on public.person_notes to authenticated;
+grant select, insert, update, delete on public.person_notes to authenticated, service_role;
 
 -- ============================================================
 -- ROW LEVEL SECURITY
@@ -126,19 +173,44 @@ alter table public.checkins  enable row level security;
 alter table public.followups enable row level security;
 
 create policy "own profile read"   on public.profiles for select to authenticated using (id = auth.uid());
+create policy "director read all profiles" on public.profiles for select to authenticated using (public.is_director());
 create policy "own profile update" on public.profiles for update to authenticated using (id = auth.uid()) with check (id = auth.uid() and role = (select role from public.profiles where id = auth.uid()));
 
-create policy "staff read people"      on public.people    for select to authenticated using (true);
+-- Support never reads this table directly — support_visible_person() row-
+-- filters correctly, but a raw `people` query would still return every
+-- column (heard_about, first_time, created_at...), not just the handful
+-- v_support_people deliberately exposes. Same reasoning as checkins below.
+create policy "staff read people"      on public.people    for select to authenticated using (public.is_director() or public.is_leader());
 create policy "director write people"  on public.people    for all    to authenticated using (public.is_director()) with check (public.is_director());
 
 create policy "staff read sessions"     on public.sessions  for select to authenticated using (true);
 create policy "director write sessions" on public.sessions  for all    to authenticated using (public.is_director()) with check (public.is_director());
 
-create policy "staff read checkins"     on public.checkins  for select to authenticated using (true);
+-- Support never gets checkins directly (that's full step history, which
+-- it's deliberately not shown) — it only gets the milestone/status summary
+-- baked into v_support_people, computed via support_visible_person() above.
+create policy "staff read checkins"     on public.checkins  for select to authenticated using (public.is_director() or public.is_leader());
 create policy "director write checkins" on public.checkins  for all    to authenticated using (public.is_director()) with check (public.is_director());
 
-create policy "staff read followups"     on public.followups for select to authenticated using (true);
+create policy "staff read followups"     on public.followups for select to authenticated using (public.is_director() or public.is_leader() or public.support_visible_person(person_id));
 create policy "director write followups" on public.followups for all    to authenticated using (public.is_director()) with check (public.is_director());
+create policy "support log followups" on public.followups for insert to authenticated with check (public.is_support() and public.support_visible_person(person_id));
+create policy "support update followups" on public.followups for update to authenticated using (public.is_support() and public.support_visible_person(person_id)) with check (public.is_support() and public.support_visible_person(person_id));
+
+-- Table-level grants. RLS above is what actually decides who sees which
+-- rows — these just let the role touch the table at all. `service_role`
+-- needs them too: it bypasses RLS (that's the point — Edge Functions like
+-- manage-staff use it), but bypassing RLS still isn't the same as having
+-- a GRANT, and Postgres checks both. Hosted Supabase projects set most of
+-- this up automatically on a new project, but a plain `supabase start` (or
+-- any non-Supabase-provisioned Postgres) doesn't, so it's spelled out here
+-- to keep the schema portable.
+grant select, insert, update, delete on public.people    to authenticated, service_role;
+grant select, insert, update, delete on public.sessions  to authenticated, service_role;
+grant select, insert, update, delete on public.checkins  to authenticated, service_role;
+grant select, insert, update, delete on public.followups to authenticated, service_role;
+grant select, update on public.profiles to authenticated;
+grant select, insert, update, delete on public.profiles to service_role;
 
 -- ============================================================
 -- PUBLIC CHECK-IN FUNCTIONS (the only doors open to visitors)
@@ -254,6 +326,7 @@ left join (
   from public.checkins
   group by person_id
 ) c on c.person_id = p.id;
+grant select on public.v_people_progress to authenticated, service_role;
 
 -- The five things the SOP weekly report needs, per session.
 create or replace view public.v_session_report
@@ -268,6 +341,50 @@ from public.sessions s
 left join public.checkins c on c.session_id = s.id
 left join public.people  p on p.id = c.person_id
 group by s.id;
+grant select on public.v_session_report to authenticated, service_role;
+
+-- The support role's whole world: just the people it's allowed to see
+-- (support_visible_person(), above), with only the fields it needs —
+-- no full step history, no data on anyone outside its three categories.
+-- Deliberately NOT security_invoker: it reads people/checkins/followups
+-- with the view owner's privileges so it keeps working even though
+-- support's own RLS on checkins is closed — this view is its one
+-- sanctioned door, the same pattern as lookup_person()/check_in() for
+-- visitors. The actual restriction lives entirely in the WHERE clause.
+create or replace view public.v_support_people as
+select
+  p.id, p.full_name, p.phone, p.email,
+  p.hc_interest, p.serving_interest, p.member_since,
+  coalesce(cs.steps_done, 0) as steps_done,
+  cs.last_seen,
+  fo.id as open_followup_id,
+  fo.status as open_followup_status,
+  fo.step as open_followup_step,
+  case
+    when p.member_since is not null then 'member'
+    when coalesce(cs.steps_done, 0) = 4 then 'membership_pipeline'
+    when fo.id is not null then 'awaiting_followup'
+    when coalesce(cs.steps_done, 0) between 1 and 3
+      and cs.last_seen is not null
+      and cs.last_seen < (current_date - (extract(dow from current_date)::int))
+      then 'noshow'
+    when p.hc_interest then 'house_church'
+    else 'other'
+  end as reason
+from public.people p
+left join (
+  select person_id, count(distinct step) as steps_done, max(checkin_date) as last_seen
+  from public.checkins group by person_id
+) cs on cs.person_id = p.id
+left join lateral (
+  select f.id, f.status, c.step from public.followups f
+  left join public.checkins c on c.id = f.checkin_id
+  where f.person_id = p.id and f.type = 'attended'
+  and (f.status = 'pending' or (f.status in ('sent','called','texted') and f.outcome is null))
+  order by f.created_at desc limit 1
+) fo on true
+where public.support_visible_person(p.id);
+grant select on public.v_support_people to authenticated, service_role;
 
 -- ============================================================
 -- AFTER RUNNING THIS FILE:
@@ -275,5 +392,9 @@ group by s.id;
 -- 2) Promote that login to director by running:
 --    update public.profiles set role = 'director', full_name = 'Next Steps Director'
 --    where id = (select id from auth.users where email = 'YOUR-EMAIL-HERE');
--- Any other users you add stay read-only leadership automatically.
+-- Any other users you add stay read-only leadership automatically. To make
+-- one a support user instead (house church interest, membership pipeline,
+-- and open follow-ups only — see support_visible_person() above):
+--    update public.profiles set role = 'support', full_name = 'Their Name'
+--    where id = (select id from auth.users where email = 'YOUR-EMAIL-HERE');
 -- ============================================================

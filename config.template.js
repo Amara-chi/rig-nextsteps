@@ -14,9 +14,9 @@ window.RIG_CONFIG = {
   SUPABASE_ANON_KEY: "PASTE-YOUR-ANON-PUBLIC-KEY-HERE",
 
   // Shown in the app and used for the QR code on the TV.
-  // TEMPORARY: using a hostingersite.com placeholder until nextsteps.rigchurchlagos.org
-  // is registered on Hostinger. Update this and re-deploy once the real subdomain is live.
-  CHECKIN_URL: "https://lightcyan-mosquito-333848.hostingersite.com",
+  // The admin app is served at the domain root; the visitor check-in form
+  // (what the QR code must point to) lives at /checkin.
+  CHECKIN_URL: "https://nextsteps.rigchurchlagos.org/checkin",
 
   CHURCH_NAME: "Rig Church Lagos",
 

@@ -11,4 +11,4 @@ Sunday check-in, journey tracking, follow-up, and reporting for the Next Steps p
 5. Serve the folder statically — locally: `python3 -m http.server 8080`; production: upload to
    the Hostinger subdomain
 
-Visitor form: `/` (kiosk mode: `/?kiosk=1`) · Staff app: `/admin/`
+Staff app: `/` · Visitor form: `/checkin` (kiosk mode: `/checkin/?kiosk=1`)

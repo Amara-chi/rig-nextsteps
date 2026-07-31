@@ -9,8 +9,8 @@ This guide takes you from the files in this folder to a live check-in system at 
 
 | File | What it is |
 |---|---|
-| `index.html` | The visitor check-in form (what the QR code opens) |
-| `admin/index.html` | The team app — director and leadership sign in here |
+| `index.html` | The team app — director and leadership sign in here (served at the domain root) |
+| `checkin/index.html` | The visitor check-in form (what the QR code opens) |
 | `config.js` | The one file you edit — your keys and settings live here |
 | `supabase/schema.sql` | The database design — pasted into Supabase once |
 | `SETUP-GUIDE.md` | This guide |
@@ -33,6 +33,12 @@ where id = (select id from auth.users where email = 'director@rigchurchlagos.org
 ```
 
 6. Add leadership accounts the same way as step 4 (e.g. the house church overseer). **Don't** run the SQL for them — every new account is automatically read-only leadership. Only the director can edit records.
+
+   For someone who only does house church, membership and follow-up outreach (not full leadership), promote them to **support** instead — they'll only see people in those three categories, not the full People list:
+   ```sql
+   update public.profiles set role = 'support', full_name = 'Their Name'
+   where id = (select id from auth.users where email = 'their-email@example.com');
+   ```
 7. Get your two keys: left menu → **Project Settings → API**. Copy the **Project URL** and the **anon public** key. You'll paste them in Part 2.
 
 > Security note: the anon key is designed to be public — it can only do what the database rules allow, which for visitors is exactly two things: look up a first name by phone number, and check in. It cannot read the contact list.
@@ -45,7 +51,7 @@ Open `config.js` in any text editor (Notepad is fine) and fill in:
 
 - `SUPABASE_URL` — the Project URL from Part 1, step 7
 - `SUPABASE_ANON_KEY` — the anon public key
-- `CHECKIN_URL` — leave as `https://nextsteps.rigchurchlagos.org` (or change if you choose a different subdomain)
+- `CHECKIN_URL` — leave as `https://nextsteps.rigchurchlagos.org/checkin` (or change if you choose a different subdomain)
 
 You can also edit the follow-up message wording in the same file at any time. Save the file.
 
@@ -60,18 +66,18 @@ You can also edit the follow-up message wording in the same file at any time. Sa
 (subdomain folder)/
    index.html
    config.js
-   admin/
+   checkin/
       index.html
 ```
 
    Tip: zip the folder contents on your computer, upload the zip, then use File Manager's **Extract**.
-3. Visit `https://nextsteps.rigchurchlagos.org` on your phone — the check-in form should load. Then visit `https://nextsteps.rigchurchlagos.org/admin/` and sign in with the director's email and password.
+3. Visit `https://nextsteps.rigchurchlagos.org` on your phone and sign in with the director's email and password — that's the team app. Then visit `https://nextsteps.rigchurchlagos.org/checkin` — the check-in form should load.
 
 ---
 
 ## Part 4 — First Sunday test run (~10 min, do this midweek)
 
-1. In the team app, go to **Session Mode**, pick a step, press **Open today's session**. A live QR code appears — this exact screen is what you'll show on the TV.
+1. In the team app, go to **Registration**, pick a step, press **Open today's session**. A live QR code appears — this exact screen is what you'll show on the TV.
 2. Scan the QR with your own phone and check yourself in as a test visitor.
 3. Watch yourself appear in **Arriving now** within a few seconds, and in **Today**.
 4. Check **Follow-Up** — your test check-in is queued with a pre-written WhatsApp message. Tap **Send on WhatsApp** to see it open with the message ready, then **Mark sent**.
@@ -82,7 +88,7 @@ You can also edit the follow-up message wording in the same file at any time. Sa
 
 ## Running it on Sundays
 
-- **Before service:** open `admin` on the TV/laptop, go to Session Mode, open today's step. The QR stays on screen.
+- **Before service:** open the team app on the TV/laptop, go to Registration, open today's step. The QR stays on screen.
 - **During:** people scan and check in on their own phones. Returning visitors are recognised by phone number and only pick the step — under 20 seconds.
 - **Sunday night / Monday:** open **Follow-Up** on your phone. Send each WhatsApp message with one tap and mark it sent. Check the **No-shows** tab on Monday and work the call-first protocol.
 - **Reporting:** the weekly report is ready the moment you end the session. Add your notes, download the PDF, send it to your leader.
@@ -105,4 +111,4 @@ You can also edit the follow-up message wording in the same file at any time. Sa
 
 ## What's next (Phase 2)
 
-Automated WhatsApp sending, in-app editing of people records, embedded session videos in Session Mode, the one-month membership countdown notification, and email of the weekly report to leadership on session close.
+Automated WhatsApp sending, in-app editing of people records, embedded session videos in Registration, the one-month membership countdown notification, and email of the weekly report to leadership on session close.

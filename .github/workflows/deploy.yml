@@ -6,8 +6,7 @@ on:
   workflow_dispatch: {}
 
 env:
-  # Update this once nextsteps.rigchurchlagos.org is registered on Hostinger.
-  HOSTING_DOMAIN: lightcyan-mosquito-333848.hostingersite.com
+  HOSTING_DOMAIN: nextsteps.rigchurchlagos.org
 
 jobs:
   deploy:
@@ -35,9 +34,10 @@ jobs:
       - name: Package static site
         run: |
           rm -rf /tmp/stage
-          mkdir -p /tmp/stage/admin
+          mkdir -p /tmp/stage/checkin
           cp index.html config.js /tmp/stage/
-          cp admin/index.html /tmp/stage/admin/
+          cp checkin/index.html /tmp/stage/checkin/
+          cp -r images /tmp/stage/images
           cd /tmp/stage && zip -r /tmp/deploy.zip .
 
       - name: Start Hostinger MCP server

@@ -1,3 +1,5 @@
 config.js
 .github/deploy-tool/node_modules/
 .vscode/
+supabase/.branches/
+supabase/.temp/
