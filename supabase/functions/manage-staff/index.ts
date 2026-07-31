@@ -63,10 +63,15 @@ Deno.serve(async (req) => {
       const email = String(body.email || "").trim();
       const full_name = String(body.full_name || "").trim();
       const role = body.role;
+      // Sent by the frontend as window.location.origin — belt-and-braces so
+      // the invite link works regardless of the project's Auth "Site URL"
+      // dashboard setting (which defaults to localhost and is easy to miss).
+      const redirectTo = String(body.redirect_to || "").trim() || undefined;
       if (!email || !ROLES.includes(role)) return fail("invalid_input");
 
       const { data, error } = await admin.auth.admin.inviteUserByEmail(email, {
         data: { full_name },
+        redirectTo,
       });
       if (error) return fail(error.message);
 

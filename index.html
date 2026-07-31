@@ -27,8 +27,8 @@ input,select,textarea{font-family:inherit;font-size:inherit;color:inherit}
 .mono{font-family:'IBM Plex Mono',monospace}
 
 /* ---------- login ---------- */
-#login{min-height:100dvh;display:grid;place-items:center;padding:24px;position:relative;overflow:hidden}
-#login::before{content:"";position:absolute;left:-30vw;right:-30vw;bottom:-40vh;height:66vh;background:var(--orange);border-radius:999px 999px 0 0;opacity:.05}
+#login,#set-password{min-height:100dvh;display:grid;place-items:center;padding:24px;position:relative;overflow:hidden}
+#login::before,#set-password::before{content:"";position:absolute;left:-30vw;right:-30vw;bottom:-40vh;height:66vh;background:var(--orange);border-radius:999px 999px 0 0;opacity:.05}
 .login-card{width:min(400px,100%);background:#fff;border:1px solid var(--line);border-radius:24px;box-shadow:var(--shadow);padding:34px 30px;position:relative}
 .brand{display:flex;align-items:center;gap:10px}
 .brand-logo{height:32px;width:auto;display:block}
@@ -280,6 +280,19 @@ tr.row-click:hover td{background:#FBF9F4}
   </div>
 </div>
 
+<!-- ================= SET PASSWORD (first sign-in after an invite, or a reset) ================= -->
+<div id="set-password" style="display:none">
+  <div class="login-card">
+    <div class="brand"><img class="brand-logo" src="images/logo.png" alt="Rig Church Lagos"><span class="brand-tag">Next Steps</span></div>
+    <h1 id="sp-title">Welcome to the team.</h1>
+    <div class="sub" id="sp-sub">Rig Church Lagos · Next Steps has invited you. Set a password to finish signing in.</div>
+    <div class="field"><label for="sp-pass">Choose a password</label><input id="sp-pass" type="password" autocomplete="new-password" placeholder="At least 8 characters"></div>
+    <div class="field"><label for="sp-pass2">Confirm password</label><input id="sp-pass2" type="password" autocomplete="new-password" placeholder="••••••••"></div>
+    <button class="btn" id="btn-set-password">Set password &amp; continue</button>
+    <div class="login-err" id="sp-err">Passwords must match and be at least 8 characters.</div>
+  </div>
+</div>
+
 <!-- ================= APP ================= -->
 <div id="app">
 <div class="shell">
@@ -470,6 +483,11 @@ tr.row-click:hover td{background:#FBF9F4}
 <script>
 (function(){
   const CFG = window.RIG_CONFIG;
+  // Read before supabase-js processes and clears the URL hash — an invite
+  // or password-reset link lands here as #access_token=...&type=invite (or
+  // type=recovery), and that's the only way to tell "just signed up" apart
+  // from a normal returning sign-in.
+  let authLinkType = (window.location.hash.match(/[#&]type=(\w+)/)||[])[1];
   const db = window.supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY);
   const $ = id => document.getElementById(id);
   let me = null;            // {id, full_name, role}
@@ -580,9 +598,34 @@ tr.row-click:hover td{background:#FBF9F4}
   $("l-pass").addEventListener("keydown", e=>{ if(e.key==="Enter") signIn(); });
   $("btn-logout").addEventListener("click", async ()=>{ await db.auth.signOut(); location.reload(); });
 
+  function showSetPassword(){
+    $("login").style.display = "none";
+    $("app").style.display = "none";
+    $("set-password").style.display = "grid";
+    if(authLinkType==="recovery"){
+      $("sp-title").textContent = "Reset your password.";
+      $("sp-sub").textContent = "Choose a new password to finish signing in.";
+    }
+  }
+  $("btn-set-password").addEventListener("click", async ()=>{
+    const p1=$("sp-pass").value, p2=$("sp-pass2").value;
+    $("sp-err").classList.remove("on");
+    if(p1.length<8 || p1!==p2){ $("sp-err").textContent="Passwords must match and be at least 8 characters."; $("sp-err").classList.add("on"); return; }
+    const btn=$("btn-set-password"); btn.disabled=true; btn.textContent="Saving…";
+    const { error } = await db.auth.updateUser({ password: p1 });
+    btn.disabled=false; btn.textContent="Set password & continue";
+    if(error){ $("sp-err").textContent = error.message || "Couldn't set that password — try again."; $("sp-err").classList.add("on"); return; }
+    authLinkType = null;
+    history.replaceState(null, "", window.location.pathname);
+    $("set-password").style.display = "none";
+    boot();
+  });
+  $("sp-pass2").addEventListener("keydown", e=>{ if(e.key==="Enter") $("btn-set-password").click(); });
+
   async function boot(){
     const { data:{ session } } = await db.auth.getSession();
     if(!session){ $("login").style.display="grid"; $("app").style.display="none"; return; }
+    if(authLinkType==="invite" || authLinkType==="recovery"){ showSetPassword(); return; }
     const { data:profile } = await db.from("profiles").select("*").eq("id", session.user.id).single();
     me = profile || { role:"leader", full_name: session.user.email };
     if(!me.full_name) me.full_name = session.user.email;
@@ -1366,7 +1409,7 @@ tr.row-click:hover td{background:#FBF9F4}
         const full_name = $("m-inv-name").value.trim();
         const role = $("m-inv-role").value;
         if(!email){ toast("Enter an email address."); return false; }
-        const res = await callStaffFn({ action:"invite", email, full_name, role });
+        const res = await callStaffFn({ action:"invite", email, full_name, role, redirect_to: window.location.origin+"/" });
         if(!res.ok){ toast("Couldn't send the invite — "+staffErrMsg(res.error)); return false; }
         toast(`Invite sent to <b>${esc(email)}</b>.`);
         renderTeam();
