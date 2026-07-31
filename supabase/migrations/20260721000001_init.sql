@@ -159,6 +159,20 @@ create policy "author or director edit notes" on public.person_notes for update 
 create policy "author or director delete notes" on public.person_notes for delete to authenticated using (author_id = auth.uid() or public.is_director());
 grant select, insert, update, delete on public.person_notes to authenticated, service_role;
 
+-- Small shared key/value store for app-wide preferences that aren't tied to
+-- any one record — e.g. which fields show on the weekly session report
+-- (key='report_fields', value=a JSON array of field keys). All staff can
+-- read; only the director can change one, same pattern as everything else.
+create table public.app_settings (
+  key text primary key,
+  value jsonb not null,
+  updated_at timestamptz not null default now()
+);
+alter table public.app_settings enable row level security;
+create policy "staff read settings" on public.app_settings for select to authenticated using (true);
+create policy "director write settings" on public.app_settings for all to authenticated using (public.is_director()) with check (public.is_director());
+grant select, insert, update, delete on public.app_settings to authenticated, service_role;
+
 -- ============================================================
 -- ROW LEVEL SECURITY
 -- Visitors (anon) can touch NOTHING directly — they only go

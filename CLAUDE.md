@@ -15,9 +15,10 @@ follow-ups, and generate reports.
   links, message templates). Never hardcode these elsewhere. Real keys are never committed.
 
 ## File map
-- `index.html` — staff app, served at the domain root (`nextsteps.rigchurchlagos.org/`): login,
-  Today dashboard, Registration (QR + video + live arrivals), People (journey, notes, editing),
-  Follow-Up Centre (3 stages), Reports
+- `index.html` — staff app, served at the domain root (`nextsteps.rigchurchlagos.org/`): login
+  (plus a set-password screen for invite/recovery links), Today dashboard, Registration (QR +
+  video + live arrivals), People (journey, notes, editing), Follow-Up Centre (3 stages),
+  Reports (customizable fields — see `app_settings` below), Team (director only)
 - `checkin/index.html` — visitor check-in form (public, mobile-first, offline queue via
   localStorage, kiosk mode via `?kiosk=1` which auto-resets after each check-in), served at
   `nextsteps.rigchurchlagos.org/checkin` — this is the URL the Sunday QR code must point to
@@ -30,9 +31,11 @@ follow-ups, and generate reports.
 - `supabase/migrations/` — same content split for `supabase db push` workflows
 - `supabase/import-history.sql` — one-time historical data load (27 people, Mar–Jul 2026);
   idempotent; run AFTER the schema
-- `supabase/upgrade-v3.sql` through `upgrade-v8.sql` — only for databases created from older
+- `supabase/upgrade-v3.sql` through `upgrade-v9.sql` — only for databases created from older
   schema versions; NOT needed on fresh installs
-- `supabase/functions/email-report` — optional Edge Function: emails weekly report via Resend
+- `supabase/functions/email-report` — optional Edge Function: emails weekly report via Resend.
+  Field selection and order matches `app_settings.report_fields` (see below) — same report,
+  same customization, whether viewed on screen or emailed.
 - `supabase/functions/send-followups` — optional Edge Function: auto-sends WhatsApp follow-ups
   via Meta WhatsApp Cloud API (requires approved template `next_steps_followup`)
 - `supabase/functions/manage-staff` — powers the Team pane (director-only): invite, remove, or

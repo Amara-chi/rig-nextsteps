@@ -402,7 +402,7 @@ tr.row-click:hover td{background:#FBF9F4}
 
     <!-- REPORTS -->
     <section class="pane" id="pane-reports">
-      <div class="page-head"><div><h1>Reports</h1><p>The five things leadership needs — auto-filled from the day's data.</p></div></div>
+      <div class="page-head"><div><h1>Reports</h1><p>What leadership needs — auto-filled from the day's data.</p></div></div>
       <div class="two-col">
         <div class="card">
           <div class="card-head">
@@ -415,6 +415,7 @@ tr.row-click:hover td{background:#FBF9F4}
             <button class="btn-sm outline" id="btn-wa-report">Send to leader (WhatsApp)</button>
             <button class="btn-sm outline" id="btn-csv-session">Download attendance CSV</button>
             <button class="btn-sm outline dir-only" id="btn-save-notes">Save changes</button>
+            <button class="btn-sm outline dir-only" id="btn-customize-fields">Customize fields</button>
             <button class="btn-sm outline dir-only" style="color:var(--orange-deep)" id="btn-delete-session">Delete session</button>
           </div>
         </div>
@@ -1146,7 +1147,55 @@ tr.row-click:hover td{background:#FBF9F4}
 
   /* ---------------- REPORTS ---------------- */
   let reportRows = [];
+  // Every field the report can show. Order here is the canonical order they're
+  // numbered in, regardless of the order they were toggled on in.
+  const REPORT_FIELD_DEFS = [
+    { key:"session_date", label:"Session date",
+      view:(r,isDir)=> isDir?`<input type="date" id="report-date" value="${r.session_date}" max="${todayStr()}">`:fmtDate(r.session_date),
+      wa:r=>`Date: ${fmtDate(r.session_date)}` },
+    { key:"step", label:"Step facilitated",
+      view:(r,isDir)=> isDir?`<select id="report-step">${CFG.STEPS.map(s=>`<option value="${s.n}" ${s.n===r.step?"selected":""}>Step ${s.n} — ${s.title}</option>`).join("")}</select>`:`Step ${r.step} — ${esc(stepOf(r.step).title)}`,
+      wa:r=>`Step: Step ${r.step} — ${stepOf(r.step).title}` },
+    { key:"attendance", label:"Attendance",
+      view:r=>`${r.attendance} people`,
+      wa:r=>`Attendance: ${r.attendance} people` },
+    { key:"first_timers", label:"First-timers",
+      view:r=>`${r.first_timers} first-timer${r.first_timers==1?"":"s"}`,
+      wa:r=>`First-timers: ${r.first_timers}` },
+    { key:"hc_interest", label:"House church interest",
+      view:r=>`${r.hc_interest} interested`,
+      wa:r=>`House church interest: ${r.hc_interest}` },
+    { key:"serving_interest", label:"Serving interest",
+      view:r=>`${r.serving_interest} interested`,
+      wa:r=>`Serving interest: ${r.serving_interest}` },
+    { key:"notes", label:"Notes for leadership",
+      view:(r,isDir)=>`<textarea id="report-notes" placeholder="Anything worth flagging…" ${isDir?"":"readonly"}>${esc(r.notes||"")}</textarea>`,
+      wa:r=>`Notes: ${($("report-notes")&&$("report-notes").value)||r.notes||"—"}` }
+  ];
+  const DEFAULT_REPORT_FIELDS = REPORT_FIELD_DEFS.map(f=>f.key);
+  let reportFieldKeys = DEFAULT_REPORT_FIELDS.slice();
+  async function loadReportFieldSettings(){
+    const { data } = await db.from("app_settings").select("value").eq("key","report_fields").maybeSingle();
+    const keys = Array.isArray(data?.value) ? data.value.filter(k=>REPORT_FIELD_DEFS.some(f=>f.key===k)) : [];
+    reportFieldKeys = keys.length ? keys : DEFAULT_REPORT_FIELDS.slice();
+  }
+  $("btn-customize-fields").addEventListener("click", ()=>{
+    openModal("Customize report fields", "Choose what shows on the weekly session report",
+      REPORT_FIELD_DEFS.map(f=>`<label style="display:flex;align-items:center;gap:9px;padding:8px 0;font-size:13.5px;color:var(--ink-deep)">
+        <input type="checkbox" data-fieldkey="${f.key}" ${reportFieldKeys.includes(f.key)?"checked":""} style="width:16px;height:16px"> ${f.label}</label>`).join(""),
+      "Save", async ()=>{
+        const chosen = [...document.querySelectorAll("[data-fieldkey]")].filter(c=>c.checked).map(c=>c.dataset.fieldkey);
+        if(!chosen.length){ toast("Pick at least one field."); return false; }
+        const ordered = DEFAULT_REPORT_FIELDS.filter(k=>chosen.includes(k));
+        const { error } = await db.from("app_settings").upsert({ key:"report_fields", value: ordered });
+        if(error){ toast("Couldn't save — check your access."); return false; }
+        reportFieldKeys = ordered;
+        renderReportDoc(+$("report-session").value||0);
+        toast("Report fields updated.");
+      });
+  });
   async function renderReports(){
+    await loadReportFieldSettings();
     const { data } = await db.from("v_session_report").select("*").order("session_date",{ascending:false}).limit(500);
     reportRows = data||[];
     $("report-session").innerHTML = reportRows.length
@@ -1160,16 +1209,16 @@ tr.row-click:hover td{background:#FBF9F4}
     const r = reportRows[i];
     if(!r){ $("report-doc").innerHTML='<div class="empty">No sessions yet — open one in Registration.</div>'; return; }
     const isDirector = me && me.role==="director";
+    const active = reportFieldKeys.map(k=>REPORT_FIELD_DEFS.find(f=>f.key===k)).filter(Boolean);
     $("report-doc").innerHTML = `
       <div class="rh"><div><h4>Next Steps — Session Report</h4><div class="mono" style="font-size:10px;color:#8A90A0;margin-top:3px">RIG CHURCH LAGOS</div></div><img src="images/favicon.png" alt="" style="width:26px;height:26px"></div>
-      <div class="report-row"><div class="rk">1 · Session date</div><div class="rv">${isDirector?`<input type="date" id="report-date" value="${r.session_date}" max="${todayStr()}">`:fmtDate(r.session_date)}</div></div>
-      <div class="report-row"><div class="rk">2 · Step facilitated</div><div class="rv">${isDirector?`<select id="report-step">${CFG.STEPS.map(s=>`<option value="${s.n}" ${s.n===r.step?"selected":""}>Step ${s.n} — ${s.title}</option>`).join("")}</select>`:`Step ${r.step} — ${esc(stepOf(r.step).title)}`}</div></div>
-      <div class="report-row"><div class="rk">3 · Attendance</div><div class="rv">${r.attendance} people · ${r.first_timers} first-timer${r.first_timers==1?"":"s"}</div></div>
-      <div class="report-row"><div class="rk">4 · Interest expressed</div><div class="rv">${r.hc_interest} house church · ${r.serving_interest} serving</div></div>
-      <div class="report-row"><div class="rk">5 · Notes for leadership</div><div class="rv"><textarea id="report-notes" placeholder="Anything worth flagging…" ${isDirector?"":"readonly"}>${esc(r.notes||"")}</textarea></div></div>`;
+      ${active.map((f,idx)=>`<div class="report-row"><div class="rk">${idx+1} · ${f.label}</div><div class="rv">${f.view(r,isDirector)}</div></div>`).join("")}`;
     $("btn-save-notes").onclick = async ()=>{
-      const upd = { notes:$("report-notes").value };
-      if(isDirector){ upd.session_date = $("report-date").value; upd.step = +$("report-step").value; }
+      const upd = {};
+      if(reportFieldKeys.includes("notes") && $("report-notes")) upd.notes = $("report-notes").value;
+      if(isDirector && reportFieldKeys.includes("session_date") && $("report-date")) upd.session_date = $("report-date").value;
+      if(isDirector && reportFieldKeys.includes("step") && $("report-step")) upd.step = +$("report-step").value;
+      if(!Object.keys(upd).length){ toast("Nothing editable is shown — add Notes, Session date, or Step in Customize fields."); return; }
       const { error } = await db.from("sessions").update(upd).eq("id",r.id);
       toast(error ? "Couldn't save changes." : "Changes saved.");
       if(!error){ Object.assign(r, upd); renderMonth(); }
@@ -1189,7 +1238,8 @@ tr.row-click:hover td{background:#FBF9F4}
       downloadCSV(`next-steps-${r.session_date}-step${r.step}.csv`, rows);
     };
     $("btn-wa-report").onclick = ()=>{
-      const text = `*Next Steps — Session Report*\nRig Church Lagos\n\n1. Date: ${fmtDate(r.session_date)}\n2. Step: Step ${r.step} — ${stepOf(r.step).title}\n3. Attendance: ${r.attendance} people (${r.first_timers} first-timer${r.first_timers==1?"":"s"})\n4. Interest: ${r.hc_interest} house church · ${r.serving_interest} serving\n5. Notes: ${($("report-notes")&&$("report-notes").value)||r.notes||"—"}`;
+      const lines = active.map((f,idx)=>`${idx+1}. ${f.wa(r)}`).join("\n");
+      const text = `*Next Steps — Session Report*\nRig Church Lagos\n\n${lines}`;
       const leader = normPhoneJS(CFG.LEADER_WHATSAPP||"");
       window.open(leader ? waLink(leader, text) : `https://wa.me/?text=${encodeURIComponent(text)}`, "_blank", "noopener");
     };

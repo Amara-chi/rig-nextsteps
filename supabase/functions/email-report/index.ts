@@ -1,7 +1,9 @@
 // ============================================================
 // OPTIONAL ADD-ON · email-report
-// Emails the five-point weekly report to leadership the moment
-// the director ends a session. Uses Resend (resend.com).
+// Emails the weekly session report to leadership the moment the
+// director ends a session. Fields shown match whatever's set in
+// the Reports pane's "Customize fields" (app_settings.report_fields).
+// Uses Resend (resend.com).
 //
 // Deploy (see PHASE2-GUIDE.md):
 //   supabase functions deploy email-report
@@ -55,20 +57,38 @@ Deno.serve(async (req) => {
     const date = new Date(r.session_date + "T00:00:00")
       .toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 
+    // Same field set and order as the Reports pane's "Customize fields" —
+    // read the director's saved choice so the email always matches what's
+    // shown on screen. Falls back to all seven if nothing's been set.
+    const FIELD_DEFS: Record<string, { label: string; value: () => string }> = {
+      session_date: { label: "Session date", value: () => date },
+      step: { label: "Step facilitated", value: () => `Step ${r.step} — ${STEP_TITLES[r.step] ?? ""}` },
+      attendance: { label: "Attendance", value: () => `${r.attendance} people` },
+      first_timers: { label: "First-timers", value: () => `${r.first_timers} first-timer(s)` },
+      hc_interest: { label: "House church interest", value: () => `${r.hc_interest} interested` },
+      serving_interest: { label: "Serving interest", value: () => `${r.serving_interest} interested` },
+      notes: { label: "Notes", value: () => (r.notes ?? "—").replace(/</g, "&lt;") },
+    };
+    const ALL_KEYS = Object.keys(FIELD_DEFS);
+    const { data: setting } = await admin.from("app_settings").select("value").eq("key", "report_fields").maybeSingle();
+    const savedKeys = Array.isArray(setting?.value) ? setting!.value.filter((k: string) => ALL_KEYS.includes(k)) : [];
+    const activeKeys = savedKeys.length ? savedKeys : ALL_KEYS;
+
+    const rows = activeKeys.map((k: string, i: number) => {
+      const f = FIELD_DEFS[k];
+      return `<tr><td style="padding:8px 0;color:#8A90A0;width:180px;vertical-align:top">${i + 1} · ${f.label}</td><td style="padding:8px 0;font-weight:bold">${f.value()}</td></tr>`;
+    }).join("");
+
     const html = `
       <div style="font-family:Arial,sans-serif;max-width:560px;margin:auto;color:#454B59">
-        <div style="border-bottom:3px solid #F25125;padding-bottom:12px;margin-bottom:18px">
-          <h2 style="margin:0;color:#313743">Next Steps — Session Report</h2>
-          <p style="margin:4px 0 0;font-size:12px;color:#8A90A0;letter-spacing:1px">RIG CHURCH LAGOS</p>
+        <div style="text-align:center;padding:22px 0;background:#EFEBE2;border-radius:14px 14px 0 0">
+          <img src="https://nextsteps.rigchurchlagos.org/images/logo.png" alt="Rig Church Lagos" style="height:42px">
         </div>
-        <table style="width:100%;font-size:14px;border-collapse:collapse">
-          <tr><td style="padding:8px 0;color:#8A90A0;width:180px">1 · Session date</td><td style="padding:8px 0;font-weight:bold">${date}</td></tr>
-          <tr><td style="padding:8px 0;color:#8A90A0">2 · Step facilitated</td><td style="padding:8px 0;font-weight:bold">Step ${r.step} — ${STEP_TITLES[r.step] ?? ""}</td></tr>
-          <tr><td style="padding:8px 0;color:#8A90A0">3 · Attendance</td><td style="padding:8px 0;font-weight:bold">${r.attendance} people · ${r.first_timers} first-timer(s)</td></tr>
-          <tr><td style="padding:8px 0;color:#8A90A0">4 · Interest expressed</td><td style="padding:8px 0;font-weight:bold">${r.hc_interest} house church · ${r.serving_interest} serving</td></tr>
-          <tr><td style="padding:8px 0;color:#8A90A0;vertical-align:top">5 · Notes</td><td style="padding:8px 0">${(r.notes ?? "—").replace(/</g, "&lt;")}</td></tr>
-        </table>
-        <p style="font-size:11px;color:#A8ADB9;margin-top:24px">Sent automatically by the Next Steps platform when the session was closed.</p>
+        <div style="padding:22px 4px 4px">
+          <h2 style="margin:0 0 18px;color:#313743">Next Steps — Session Report</h2>
+          <table style="width:100%;font-size:14px;border-collapse:collapse">${rows}</table>
+          <p style="font-size:11px;color:#A8ADB9;margin-top:24px">Sent automatically by the Next Steps platform when the session was closed.</p>
+        </div>
       </div>`;
 
     const res = await fetch("https://api.resend.com/emails", {
