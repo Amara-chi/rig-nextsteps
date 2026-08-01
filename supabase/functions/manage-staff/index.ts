@@ -11,10 +11,13 @@
 //
 // Safety rules (enforced here, not just in the UI, so they hold even
 // if someone calls this function directly):
-//   - A director can never remove or re-role themselves, or another
-//     director. Director accounts can only be changed by hand in
-//     Supabase (Authentication > Users + a SQL update) — deliberately,
-//     so one director can never lock another out or be locked out.
+//   - A director can never remove or re-role themselves. No exceptions —
+//     including SUPER_ADMIN_EMAIL below — so nobody can lock themselves out.
+//   - A director can never remove or re-role another director either,
+//     UNLESS they're signed in as SUPER_ADMIN_EMAIL (org's decision,
+//     2026-08-01: exactly one account may manage other admins). Everyone
+//     else changes director accounts by hand in Supabase (Authentication >
+//     Users + a SQL update), on purpose.
 //   - A director can freely invite, remove, or re-role leader/support
 //     accounts, and can promote any non-director account up to director.
 // ============================================================
@@ -25,6 +28,9 @@ const cors = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 const ROLES = ["director", "leader", "support"];
+// The one account allowed to remove/re-role other directors. Case-
+// insensitive compare against the caller's verified auth email below.
+const SUPER_ADMIN_EMAIL = "adewale.jody@gmail.com";
 
 function fail(error: string, status = 400) {
   return new Response(JSON.stringify({ ok: false, error }), {
@@ -90,7 +96,8 @@ Deno.serve(async (req) => {
       const { data: target, error: targetErr } = await admin
         .from("profiles").select("role").eq("id", user_id).single();
       if (targetErr || !target) return fail("not_found", 404);
-      if (target.role === "director") return fail("cannot_change_another_director");
+      const isSuperAdmin = (callerUser.email ?? "").toLowerCase() === SUPER_ADMIN_EMAIL;
+      if (target.role === "director" && !isSuperAdmin) return fail("cannot_change_another_director");
 
       if (action === "remove") {
         const { error } = await admin.auth.admin.deleteUser(user_id);

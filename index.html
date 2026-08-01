@@ -194,7 +194,13 @@ tr.row-click:hover td{background:#FBF9F4}
 .rdoc-band img{height:32px;width:auto;flex:none}
 .rdoc-band .rdoc-title{font-size:16px;font-weight:900;letter-spacing:-.02em;color:var(--ink-deep);line-height:1.2}
 .rdoc-band .rdoc-sub{font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:#8A8378;margin-top:2px}
-.rdoc-fields{padding:4px 24px 0}
+.rdoc-fields{padding:6px 24px 0}
+.rdoc-field{padding:10px 0;border-bottom:1px dashed var(--line)}
+.rdoc-field:last-child{border-bottom:none}
+.rdoc-field .rk{font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:#8A90A0;font-weight:600;display:block;margin-bottom:7px}
+.rdoc-field .rv{font-weight:700;font-size:14px;color:var(--ink-deep)}
+.rdoc-field input[type=date],.rdoc-field select{width:100%;max-width:100%;box-sizing:border-box;padding:10px 12px;border:1.5px solid var(--line);border-radius:10px;background:#fff;font-size:13.5px;font-family:inherit;color:var(--ink-deep)}
+.rdoc-field input[type=date]:focus,.rdoc-field select:focus{outline:none;border-color:var(--orange);box-shadow:0 0 0 3px var(--orange-soft)}
 .rdoc-stats{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;padding:18px 24px 2px}
 .rdoc-stats .stat{box-shadow:none;border:1px solid var(--line);padding:12px 14px}
 .rdoc-stats .stat .v{font-size:23px}
@@ -429,6 +435,7 @@ tr.row-click:hover td{background:#FBF9F4}
             <button class="btn-sm outline" id="btn-csv-session">Download attendance CSV</button>
             <button class="btn-sm outline dir-only" id="btn-save-notes">Save changes</button>
             <button class="btn-sm outline dir-only" id="btn-customize-fields">Customize fields</button>
+            <button class="btn-sm outline dir-only" id="btn-add-field">Add a field</button>
             <button class="btn-sm outline dir-only" style="color:var(--orange-deep)" id="btn-delete-session">Delete session</button>
           </div>
         </div>
@@ -1251,14 +1258,26 @@ tr.row-click:hover td{background:#FBF9F4}
     const details = active.filter(f=>f.kind==="detail");
     const stats = active.filter(f=>f.kind==="stat");
     const notesField = active.find(f=>f.kind==="notes");
+    const customFields = Array.isArray(r.custom_fields) ? r.custom_fields : [];
     $("report-doc").innerHTML = `
       <div class="rdoc-band">
         <img src="images/logo.png" alt="Rig Church Lagos">
         <div><div class="rdoc-title">Session Report</div><div class="rdoc-sub">Next Steps · Rig Church Lagos</div></div>
       </div>
-      ${details.length?`<div class="rdoc-fields">${details.map(f=>`<div class="report-row"><div class="rk">${f.label}</div><div class="rv">${f.view(r,isDirector)}</div></div>`).join("")}</div>`:""}
+      ${details.length?`<div class="rdoc-fields">${details.map(f=>`<div class="rdoc-field"><span class="rk">${f.label}</span><div class="rv">${f.view(r,isDirector)}</div></div>`).join("")}</div>`:""}
       ${stats.length?`<div class="rdoc-stats">${stats.map(f=>`<div class="stat"><div class="k">${f.label}</div><div class="v">${f.num(r)}</div></div>`).join("")}</div>`:""}
+      ${customFields.length?`<div class="rdoc-fields">${customFields.map((cf,idx)=>`
+        <div class="rdoc-field"><span class="rk">${esc(cf.label)}</span><div class="rv" style="display:flex;align-items:center;gap:8px">
+          <span style="flex:1">${esc(cf.value)}</span>${isDirector?`<button class="note-del" data-rmfield="${idx}" title="Remove field">✕</button>`:""}
+        </div></div>`).join("")}</div>`:""}
       ${notesField?`<div class="rdoc-notes"><span class="rk">${notesField.label}</span>${notesField.view(r,isDirector)}</div>`:""}`;
+    $("report-doc").querySelectorAll("[data-rmfield]").forEach(b=>b.addEventListener("click", async ()=>{
+      const updated = customFields.slice(); updated.splice(+b.dataset.rmfield, 1);
+      const { error } = await db.from("sessions").update({custom_fields: updated}).eq("id", r.id);
+      if(error){ toast("Couldn't remove — check your access."); return; }
+      r.custom_fields = updated;
+      renderReportDoc(i);
+    }));
     $("btn-save-notes").onclick = async ()=>{
       const upd = {};
       if(reportFieldKeys.includes("notes") && $("report-notes")) upd.notes = $("report-notes").value;
@@ -1284,12 +1303,33 @@ tr.row-click:hover td{background:#FBF9F4}
       downloadCSV(`next-steps-${r.session_date}-step${r.step}.csv`, rows);
     };
     $("btn-wa-report").onclick = ()=>{
-      const lines = active.map((f,idx)=>`${idx+1}. ${f.wa(r)}`).join("\n");
+      const lines = active.map((f,idx)=>`${idx+1}. ${f.wa(r)}`)
+        .concat(customFields.map((cf,idx)=>`${active.length+idx+1}. ${cf.label}: ${cf.value}`))
+        .join("\n");
       const text = `*Next Steps — Session Report*\nRig Church Lagos\n\n${lines}`;
       const leader = normPhoneJS(CFG.LEADER_WHATSAPP||"");
       window.open(leader ? waLink(leader, text) : `https://wa.me/?text=${encodeURIComponent(text)}`, "_blank", "noopener");
     };
   }
+  $("btn-add-field").addEventListener("click", ()=>{
+    const i = +($("report-session").value||0);
+    const r = reportRows[i];
+    if(!r) return;
+    openModal("Add a field", "Add something one-off to this week's report", `
+      <div class="field"><label>Field title</label><input id="m-field-label" placeholder="e.g. Guest speaker" maxlength="60"></div>
+      <div class="field"><label>Value</label><input id="m-field-value" placeholder="e.g. Pastor John Doe" maxlength="300"></div>`,
+      "Add field", async ()=>{
+        const label = $("m-field-label").value.trim();
+        const value = $("m-field-value").value.trim();
+        if(!label || !value){ toast("Enter both a title and a value."); return false; }
+        const updated = (Array.isArray(r.custom_fields)?r.custom_fields:[]).concat([{label,value}]);
+        const { error } = await db.from("sessions").update({custom_fields: updated}).eq("id", r.id);
+        if(error){ toast("Couldn't save — check your access."); return false; }
+        r.custom_fields = updated;
+        renderReportDoc(i);
+        toast("Field added.");
+      });
+  });
   function isoDate(d){ return d.toISOString().slice(0,10); }
   function currentRange(){
     const kind = $("range-select").value;
@@ -1346,33 +1386,28 @@ tr.row-click:hover td{background:#FBF9F4}
   }
 
   /* ---------------- SUPPORT (restricted role) ---------------- */
-  const SUPPORT_REASON = {
-    member:              ["green","Member"],
-    membership_pipeline: ["navy","Membership pipeline"],
-    awaiting_followup:   ["orange","Awaiting follow-up"],
-    noshow:              ["grey","No-show — needs a call"],
-    house_church:        ["orange","House church interested"],
-    other:               ["grey","—"]
-  };
+  // Independent flags, not mutually exclusive — someone can be house-church
+  // interested AND finished all 4 steps AND awaiting a follow-up all at once,
+  // and shows up on every page that applies.
   async function renderSupport(){
     const { data, error } = await db.from("v_support_people").select("*").order("full_name");
-    const groups = { hc:[], followup:[], membership:[] };
-    if(!error){
-      (data||[]).forEach(p=>{
-        if(p.reason==="awaiting_followup" || p.reason==="noshow") groups.followup.push(p);
-        else if(p.reason==="membership_pipeline" || p.reason==="member") groups.membership.push(p);
-        else groups.hc.push(p); // house_church, and the (unreachable in practice) "other" fallback
-      });
-    }
-    renderSupportGroup("support-list-hc", groups.hc, !!error);
-    renderSupportGroup("support-list-followup", groups.followup, !!error);
-    renderSupportGroup("support-list-membership", groups.membership, !!error);
+    const list = data||[];
+    renderSupportGroup("support-list-hc", list.filter(p=>p.is_house_church), !!error, "hc");
+    renderSupportGroup("support-list-followup", list.filter(p=>p.is_awaiting_followup||p.is_noshow), !!error, "followup");
+    renderSupportGroup("support-list-membership", list.filter(p=>p.is_membership), !!error, "membership");
   }
-  function renderSupportGroup(containerId, list, hadError){
+  function supportBadge(p, context){
+    if(context==="hc") return ["orange","House church interested"];
+    if(context==="membership") return p.member_since ? ["green","Member"] : ["navy","Membership pipeline"];
+    // followup
+    if(p.is_noshow) return ["grey","No-show — needs a call"];
+    return ["orange","Awaiting follow-up"];
+  }
+  function renderSupportGroup(containerId, list, hadError, context){
     const box = $(containerId);
     if(hadError){ box.innerHTML = '<div class="empty">Couldn\'t load — check your access.</div>'; return; }
     box.innerHTML = list.length ? list.map(p=>{
-      const [bc,bt] = SUPPORT_REASON[p.reason]||SUPPORT_REASON.other;
+      const [bc,bt] = supportBadge(p, context);
       return `<div class="fu-item" style="flex-direction:column;align-items:stretch">
         <div style="display:flex;gap:13px;align-items:flex-start;flex-wrap:wrap">
           <div class="avatar">${initials(p.full_name)}</div>
@@ -1401,7 +1436,9 @@ tr.row-click:hover td{background:#FBF9F4}
       loadNotes(p.id);
       const actions = box.querySelector(`[data-actions="${p.id}"]`);
       if(!actions) return;
-      if(p.reason==="awaiting_followup" && p.open_followup_id && p.open_followup_status==="pending"){
+      // Follow-up-specific actions only make sense on the Follow Up page —
+      // elsewhere (House Church, Membership) always just offer plain contact.
+      if(context==="followup" && p.is_awaiting_followup && p.open_followup_status==="pending"){
         const completed = p.steps_done===4;
         const first = p.full_name.split(" ")[0];
         const msg = completed ? fillMsg(CFG.MSG_COMPLETED, first, p.open_followup_step) : fillMsg(CFG.MSG_ATTENDED, first, p.open_followup_step||"");
@@ -1414,7 +1451,7 @@ tr.row-click:hover td{background:#FBF9F4}
           toast("Sent — log the outcome once you hear back.");
           setTimeout(renderSupport, 1000);
         });
-      } else if(p.reason==="awaiting_followup" && p.open_followup_id){
+      } else if(context==="followup" && p.is_awaiting_followup){
         actions.innerHTML = `<a class="btn-sm outline" href="${waLink(p.phone,"")}" target="_blank" rel="noopener">Open chat</a>
           <button class="btn-sm" data-logout="${p.open_followup_id}" data-pid="${p.id}">Log outcome</button>`;
         actions.querySelector("[data-logout]").addEventListener("click", ()=>{
@@ -1427,7 +1464,7 @@ tr.row-click:hover td{background:#FBF9F4}
             renderSupport();
           });
         });
-      } else if(p.reason==="noshow"){
+      } else if(context==="followup" && p.is_noshow){
         actions.innerHTML = `<a class="btn-sm outline" href="${waLink(p.phone,"")}" target="_blank" rel="noopener">Open chat</a>
           <button class="btn-sm" data-nslog="1">Log outcome</button>`;
         actions.querySelector("[data-nslog]").addEventListener("click", ()=>{

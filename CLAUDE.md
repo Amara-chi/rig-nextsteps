@@ -18,7 +18,9 @@ follow-ups, and generate reports.
 - `index.html` — staff app, served at the domain root (`nextsteps.rigchurchlagos.org/`): login
   (plus a set-password screen for invite/recovery links), Today dashboard, Registration (QR +
   video + live arrivals), People (journey, notes, editing), Follow-Up Centre (3 stages),
-  Reports (customizable fields — see `app_settings` below), Team (director only)
+  Reports (customizable fields via `app_settings.report_fields`, below, plus ad-hoc one-off
+  fields per session via `sessions.custom_fields` — "Add a field" for anything not worth a
+  permanent one), Team (director only)
 - `checkin/index.html` — visitor check-in form (public, mobile-first, offline queue via
   localStorage, kiosk mode via `?kiosk=1` which auto-resets after each check-in), served at
   `nextsteps.rigchurchlagos.org/checkin` — this is the URL the Sunday QR code must point to
@@ -31,7 +33,7 @@ follow-ups, and generate reports.
 - `supabase/migrations/` — same content split for `supabase db push` workflows
 - `supabase/import-history.sql` — one-time historical data load (27 people, Mar–Jul 2026);
   idempotent; run AFTER the schema
-- `supabase/upgrade-v3.sql` through `upgrade-v9.sql` — only for databases created from older
+- `supabase/upgrade-v3.sql` through `upgrade-v11.sql` — only for databases created from older
   schema versions; NOT needed on fresh installs
 - `supabase/functions/email-report` — optional Edge Function: emails weekly report via Resend.
   Field selection and order matches `app_settings.report_fields` (see below) — same report,
@@ -42,8 +44,10 @@ follow-ups, and generate reports.
   re-role staff without hand-running SQL. Deploy it (`supabase functions deploy manage-staff`)
   for that pane to work; without it, role management still falls back to the manual SQL in
   `schema.sql`'s closing comment. Business rule enforced server-side, not just in the UI: a
-  director can never remove or re-role themselves or another director — only by hand in
-  Supabase, on purpose.
+  director can never remove or re-role themselves (no exceptions) or another director — only
+  by hand in Supabase, on purpose — EXCEPT one named account (`SUPER_ADMIN_EMAIL` in the
+  function, org decision 2026-08-01) which can remove/re-role other directors, though still
+  never itself.
 
 ## Fresh environment bootstrap (in order)
 1. Create a Supabase project (or `supabase start` for local dev).
@@ -85,6 +89,12 @@ Three staff roles, checked by `public.is_director()` / `is_leader()` / `is_suppo
   never full step history. `followups` and `person_notes` ARE readable/writable directly, but
   row-scoped to `support_visible_person()` on every policy (SELECT/INSERT on notes, SELECT on
   followups; INSERT/UPDATE on followups to log an outcome) — nothing outside that filter.
+  UI shows this as 3 separate pages (House Church / Follow Up / Membership). `v_support_people`
+  exposes these as INDEPENDENT booleans (`is_house_church`, `is_membership`,
+  `is_awaiting_followup`, `is_noshow`), not one mutually-exclusive category — a person can be
+  house-church-interested AND have finished all 4 steps at once, and must show up on both
+  pages. (An earlier version used a single priority-ordered `reason` column and got this
+  wrong — it silently hid house-church interest on anyone who'd also completed all 4 steps.)
 - `anon` (visitors): can ONLY call two RPCs — `lookup_person(phone)` (returns first name +
   steps, nothing else) and `check_in(...)`. No table access. Never widen this.
 - Phone numbers are stored normalised by `norm_phone()`: Nigerian → `234XXXXXXXXXX`,

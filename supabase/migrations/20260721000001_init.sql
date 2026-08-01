@@ -57,6 +57,7 @@ create table public.sessions (
   step int not null check (step between 1 and 4),
   is_open boolean not null default true,
   notes text,
+  custom_fields jsonb not null default '[]'::jsonb, -- ad-hoc [{label,value}] added to one week's report
   created_at timestamptz not null default now()
 );
 
@@ -350,7 +351,8 @@ select
   count(c.id) as attendance,
   count(c.id) filter (where p.created_at::date = s.session_date) as first_timers,
   count(distinct c.person_id) filter (where p.hc_interest) as hc_interest,
-  count(distinct c.person_id) filter (where p.serving_interest) as serving_interest
+  count(distinct c.person_id) filter (where p.serving_interest) as serving_interest,
+  s.custom_fields
 from public.sessions s
 left join public.checkins c on c.session_id = s.id
 left join public.people  p on p.id = c.person_id
@@ -365,6 +367,13 @@ grant select on public.v_session_report to authenticated, service_role;
 -- support's own RLS on checkins is closed — this view is its one
 -- sanctioned door, the same pattern as lookup_person()/check_in() for
 -- visitors. The actual restriction lives entirely in the WHERE clause.
+--
+-- is_house_church / is_followup / is_membership are independent flags,
+-- NOT a single mutually-exclusive category — someone can be house-church
+-- interested AND have completed all 4 steps at the same time, and needs
+-- to show up in both. (A single priority-ordered "reason" column was
+-- tried here first and was wrong: it silently hid the house-church flag
+-- on anyone who'd also finished all 4 steps.)
 create or replace view public.v_support_people as
 select
   p.id, p.full_name, p.phone, p.email,
@@ -374,17 +383,14 @@ select
   fo.id as open_followup_id,
   fo.status as open_followup_status,
   fo.step as open_followup_step,
-  case
-    when p.member_since is not null then 'member'
-    when coalesce(cs.steps_done, 0) = 4 then 'membership_pipeline'
-    when fo.id is not null then 'awaiting_followup'
-    when coalesce(cs.steps_done, 0) between 1 and 3
-      and cs.last_seen is not null
-      and cs.last_seen < (current_date - (extract(dow from current_date)::int))
-      then 'noshow'
-    when p.hc_interest then 'house_church'
-    else 'other'
-  end as reason
+  p.hc_interest as is_house_church,
+  (p.member_since is not null or coalesce(cs.steps_done, 0) = 4) as is_membership,
+  (fo.id is not null) as is_awaiting_followup,
+  (
+    coalesce(cs.steps_done, 0) between 1 and 3
+    and cs.last_seen is not null
+    and cs.last_seen < (current_date - (extract(dow from current_date)::int))
+  ) as is_noshow
 from public.people p
 left join (
   select person_id, count(distinct step) as steps_done, max(checkin_date) as last_seen

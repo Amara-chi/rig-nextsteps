@@ -96,6 +96,12 @@ Deno.serve(async (req) => {
       statTable += `<tr>${cells}${pair.length === 1 ? '<td style="width:50%"></td>' : ""}</tr>`;
     }
 
+    // Ad-hoc fields the director added just for this session (sessions.custom_fields).
+    const customList: { label: string; value: string }[] = Array.isArray(r.custom_fields) ? r.custom_fields : [];
+    const customRows = customList.map((cf) =>
+      `<tr><td style="padding:7px 0;color:#8A90A0;width:180px;vertical-align:top">${String(cf.label).replace(/</g, "&lt;")}</td><td style="padding:7px 0;font-weight:bold">${String(cf.value).replace(/</g, "&lt;")}</td></tr>`
+    ).join("");
+
     const html = `
       <div style="font-family:Arial,sans-serif;max-width:560px;margin:auto;color:#454B59">
         <div style="text-align:center;padding:22px 0;background:#EFEBE2;border-radius:14px 14px 0 0">
@@ -104,7 +110,8 @@ Deno.serve(async (req) => {
         <div style="padding:22px 4px 4px">
           <h2 style="margin:0 0 18px;color:#313743">Next Steps — Session Report</h2>
           ${detailRows ? `<table style="width:100%;font-size:14px;border-collapse:collapse;margin-bottom:${stats.length ? 14 : 0}px">${detailRows}</table>` : ""}
-          ${statTable ? `<table style="width:100%;border-collapse:collapse;margin-bottom:${notesKey ? 14 : 0}px">${statTable}</table>` : ""}
+          ${statTable ? `<table style="width:100%;border-collapse:collapse;margin-bottom:${customRows ? 14 : (notesKey ? 14 : 0)}px">${statTable}</table>` : ""}
+          ${customRows ? `<table style="width:100%;font-size:14px;border-collapse:collapse;margin-bottom:${notesKey ? 14 : 0}px">${customRows}</table>` : ""}
           ${notesKey ? `<div style="font-size:9px;letter-spacing:1px;text-transform:uppercase;color:#8A90A0;margin-bottom:4px">${FIELD_DEFS[notesKey].label}</div><div style="font-size:14px">${FIELD_DEFS[notesKey].value()}</div>` : ""}
           <p style="font-size:11px;color:#A8ADB9;margin-top:24px">Sent automatically by the Next Steps platform when the session was closed.</p>
         </div>
