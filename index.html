@@ -39,6 +39,11 @@ input,select,textarea{font-family:inherit;font-size:inherit;color:inherit}
 .field label{display:block;font-size:12.5px;font-weight:700;margin-bottom:6px;color:var(--ink-deep)}
 .field input,.field select,.field textarea{width:100%;padding:14px 15px;border:1.5px solid var(--line);border-radius:12px;background:var(--cream);font-size:15px;transition:.15s}
 .field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--orange);background:#fff;box-shadow:0 0 0 3px var(--orange-soft)}
+.pw-wrap{position:relative}
+.pw-wrap input{padding-right:46px!important}
+.pw-toggle{position:absolute;right:5px;top:50%;transform:translateY(-50%);width:34px;height:34px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#8A90A0}
+.pw-toggle:hover{color:var(--ink-deep);background:var(--cream-deep)}
+.pw-toggle svg{width:19px;height:19px}
 .btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:15px;border-radius:13px;background:var(--orange);color:#fff;font-weight:800;font-size:15px;transition:.15s;margin-top:18px}
 .btn:hover{background:var(--orange-deep)}
 .btn:disabled{opacity:.55;cursor:wait}
@@ -184,9 +189,17 @@ tr.row-click:hover td{background:#FBF9F4}
 .script-box{padding:13px 15px;border-left:3px solid var(--orange);background:var(--cream);border-radius:0 12px 12px 0;font-size:12px;color:#5A6070;font-style:italic;margin:10px 0}
 
 /* reports */
-.report-doc{border:1.5px solid var(--line);border-radius:14px;padding:22px 24px;background:#FDFCF9}
-.report-doc .rh{display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:14px;border-bottom:2px solid var(--ink-deep);margin-bottom:14px}
-.report-doc h4{font-size:17px;font-weight:900;letter-spacing:-.02em;color:var(--ink-deep)}
+.report-doc{border:1.5px solid var(--line);border-radius:16px;padding-bottom:22px;background:#FDFCF9;overflow:hidden}
+.rdoc-band{display:flex;align-items:center;gap:14px;padding:20px 24px;background:linear-gradient(135deg,var(--cream) 0%,var(--cream-deep) 100%)}
+.rdoc-band img{height:32px;width:auto;flex:none}
+.rdoc-band .rdoc-title{font-size:16px;font-weight:900;letter-spacing:-.02em;color:var(--ink-deep);line-height:1.2}
+.rdoc-band .rdoc-sub{font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:#8A8378;margin-top:2px}
+.rdoc-fields{padding:4px 24px 0}
+.rdoc-stats{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;padding:18px 24px 2px}
+.rdoc-stats .stat{box-shadow:none;border:1px solid var(--line);padding:12px 14px}
+.rdoc-stats .stat .v{font-size:23px}
+.rdoc-notes{padding:16px 24px 0}
+.rdoc-notes .rk{font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:#8A90A0;font-weight:600;margin-bottom:7px;display:block}
 .report-row{display:flex;gap:12px;padding:8px 0;border-bottom:1px dashed var(--line);font-size:13px;flex-wrap:wrap}
 .report-row:last-child{border:none}
 .report-row .rk{font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:#8A90A0;width:170px;flex:none;padding-top:2px;font-weight:600}
@@ -274,7 +287,7 @@ tr.row-click:hover td{background:#FBF9F4}
     <h1>Team sign in.</h1>
     <div class="sub">For the Next Steps Admin and leadership. Visitors don't need an account — they use the QR code.</div>
     <div class="field"><label for="l-email">Email</label><input id="l-email" type="email" autocomplete="username" placeholder="you@rigchurchlagos.org"></div>
-    <div class="field"><label for="l-pass">Password</label><input id="l-pass" type="password" autocomplete="current-password" placeholder="••••••••"></div>
+    <div class="field"><label for="l-pass">Password</label><div class="pw-wrap"><input id="l-pass" type="password" autocomplete="current-password" placeholder="••••••••"><button type="button" class="pw-toggle" data-toggle="l-pass" aria-label="Show password"></button></div></div>
     <button class="btn" id="btn-login">Sign in</button>
     <div class="login-err" id="login-err">That email or password didn't match. Please try again.</div>
   </div>
@@ -286,8 +299,8 @@ tr.row-click:hover td{background:#FBF9F4}
     <div class="brand"><img class="brand-logo" src="images/logo.png" alt="Rig Church Lagos"><span class="brand-tag">Next Steps</span></div>
     <h1 id="sp-title">Welcome to the team.</h1>
     <div class="sub" id="sp-sub">Rig Church Lagos · Next Steps has invited you. Set a password to finish signing in.</div>
-    <div class="field"><label for="sp-pass">Choose a password</label><input id="sp-pass" type="password" autocomplete="new-password" placeholder="At least 8 characters"></div>
-    <div class="field"><label for="sp-pass2">Confirm password</label><input id="sp-pass2" type="password" autocomplete="new-password" placeholder="••••••••"></div>
+    <div class="field"><label for="sp-pass">Choose a password</label><div class="pw-wrap"><input id="sp-pass" type="password" autocomplete="new-password" placeholder="At least 8 characters"><button type="button" class="pw-toggle" data-toggle="sp-pass" aria-label="Show password"></button></div></div>
+    <div class="field"><label for="sp-pass2">Confirm password</label><div class="pw-wrap"><input id="sp-pass2" type="password" autocomplete="new-password" placeholder="••••••••"><button type="button" class="pw-toggle" data-toggle="sp-pass2" aria-label="Show password"></button></div></div>
     <button class="btn" id="btn-set-password">Set password &amp; continue</button>
     <div class="login-err" id="sp-err">Passwords must match and be at least 8 characters.</div>
   </div>
@@ -441,10 +454,22 @@ tr.row-click:hover td{background:#FBF9F4}
     </section>
 
     <!-- SUPPORT (restricted role: house church, membership, follow-up only) -->
-    <section class="pane" id="pane-support">
-      <div class="page-head"><div><h1>People</h1><p>House church interest, the membership pipeline, and anyone with an open follow-up.</p></div></div>
+    <section class="pane" id="pane-support-hc">
+      <div class="page-head"><div><h1>House Church</h1><p>Everyone who's expressed interest.</p></div></div>
       <div class="card">
-        <div id="support-list"><div class="empty">Loading…</div></div>
+        <div id="support-list-hc"><div class="empty">Loading…</div></div>
+      </div>
+    </section>
+    <section class="pane" id="pane-support-followup">
+      <div class="page-head"><div><h1>Follow Up</h1><p>A pending message, awaiting an outcome, or a no-show.</p></div></div>
+      <div class="card">
+        <div id="support-list-followup"><div class="empty">Loading…</div></div>
+      </div>
+    </section>
+    <section class="pane" id="pane-support-membership">
+      <div class="page-head"><div><h1>Membership</h1><p>Completed all 4 steps — in the window, ready, or already welcomed.</p></div></div>
+      <div class="card">
+        <div id="support-list-membership"><div class="empty">Loading…</div></div>
       </div>
     </section>
 
@@ -554,7 +579,9 @@ tr.row-click:hover td{background:#FBF9F4}
     {id:"reports", label:"Reports",     icon:'<path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8zM14 2v6h6M16 13H8M16 17H8"/>'}
   ];
   const NAV_SUPPORT = [
-    {id:"support", label:"People",      icon:'<path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/><circle cx="9" cy="7" r="4"/>'}
+    {id:"support-hc",         label:"House Church", icon:'<path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><path d="M9 22V12h6v10"/>'},
+    {id:"support-followup",   label:"Follow Up",    icon:'<path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/>'},
+    {id:"support-membership", label:"Membership",   icon:'<path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/><circle cx="9" cy="7" r="4"/>'}
   ];
   const NAV_TEAM = {id:"team", label:"Team", icon:'<path d="M20 21v-2a4 4 0 00-3-3.87M14 3.13a4 4 0 010 7.75M4 21v-2a4 4 0 014-4h4a4 4 0 014 4v2"/><circle cx="10" cy="7" r="4"/>'};
   function buildNav(){
@@ -565,7 +592,7 @@ tr.row-click:hover td{background:#FBF9F4}
     $("side-nav").innerHTML = NAV.map(n=>`<button data-pane="${n.id}">${mk(n,true)}</button>`).join("");
     $("bottom-nav").innerHTML = NAV.map(n=>`<button data-pane="${n.id}">${mk(n,false)}</button>`).join("");
     document.querySelectorAll("[data-pane]").forEach(b=>b.addEventListener("click",()=>switchPane(b.dataset.pane)));
-    switchPane(me && me.role==="support" ? "support" : "today");
+    switchPane(me && me.role==="support" ? "support-hc" : "today");
   }
   function initSideCollapse(){
     const side = document.querySelector(".side");
@@ -585,6 +612,21 @@ tr.row-click:hover td{background:#FBF9F4}
     window.scrollTo(0,0);
     if(p==="team") renderTeam();
   }
+
+  /* ---------------- password visibility ---------------- */
+  const EYE_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>';
+  const EYE_OFF_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.94 10.94 0 0112 20c-7 0-11-7-11-7a21.6 21.6 0 015.06-6.06M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 7 11 7a21.6 21.6 0 01-2.44 3.4M14.12 14.12a3 3 0 11-4.24-4.24"/><path d="M1 1l22 22"/></svg>';
+  document.querySelectorAll(".pw-toggle").forEach(btn=>{
+    btn.innerHTML = EYE_ICON;
+    btn.addEventListener("click", ()=>{
+      const inp = $(btn.dataset.toggle);
+      if(!inp) return;
+      const show = inp.type==="password";
+      inp.type = show ? "text" : "password";
+      btn.innerHTML = show ? EYE_OFF_ICON : EYE_ICON;
+      btn.setAttribute("aria-label", show ? "Hide password" : "Show password");
+    });
+  });
 
   /* ---------------- auth ---------------- */
   async function signIn(){
@@ -1150,25 +1192,21 @@ tr.row-click:hover td{background:#FBF9F4}
   // Every field the report can show. Order here is the canonical order they're
   // numbered in, regardless of the order they were toggled on in.
   const REPORT_FIELD_DEFS = [
-    { key:"session_date", label:"Session date",
+    { key:"session_date", label:"Session date", kind:"detail",
       view:(r,isDir)=> isDir?`<input type="date" id="report-date" value="${r.session_date}" max="${todayStr()}">`:fmtDate(r.session_date),
       wa:r=>`Date: ${fmtDate(r.session_date)}` },
-    { key:"step", label:"Step facilitated",
+    { key:"step", label:"Step facilitated", kind:"detail",
       view:(r,isDir)=> isDir?`<select id="report-step">${CFG.STEPS.map(s=>`<option value="${s.n}" ${s.n===r.step?"selected":""}>Step ${s.n} — ${s.title}</option>`).join("")}</select>`:`Step ${r.step} — ${esc(stepOf(r.step).title)}`,
       wa:r=>`Step: Step ${r.step} — ${stepOf(r.step).title}` },
-    { key:"attendance", label:"Attendance",
-      view:r=>`${r.attendance} people`,
+    { key:"attendance", label:"Attendance", kind:"stat", num:r=>r.attendance,
       wa:r=>`Attendance: ${r.attendance} people` },
-    { key:"first_timers", label:"First-timers",
-      view:r=>`${r.first_timers} first-timer${r.first_timers==1?"":"s"}`,
+    { key:"first_timers", label:"First-timers", kind:"stat", num:r=>r.first_timers,
       wa:r=>`First-timers: ${r.first_timers}` },
-    { key:"hc_interest", label:"House church interest",
-      view:r=>`${r.hc_interest} interested`,
+    { key:"hc_interest", label:"House church interest", kind:"stat", num:r=>r.hc_interest,
       wa:r=>`House church interest: ${r.hc_interest}` },
-    { key:"serving_interest", label:"Serving interest",
-      view:r=>`${r.serving_interest} interested`,
+    { key:"serving_interest", label:"Serving interest", kind:"stat", num:r=>r.serving_interest,
       wa:r=>`Serving interest: ${r.serving_interest}` },
-    { key:"notes", label:"Notes for leadership",
+    { key:"notes", label:"Notes for leadership", kind:"notes",
       view:(r,isDir)=>`<textarea id="report-notes" placeholder="Anything worth flagging…" ${isDir?"":"readonly"}>${esc(r.notes||"")}</textarea>`,
       wa:r=>`Notes: ${($("report-notes")&&$("report-notes").value)||r.notes||"—"}` }
   ];
@@ -1210,9 +1248,17 @@ tr.row-click:hover td{background:#FBF9F4}
     if(!r){ $("report-doc").innerHTML='<div class="empty">No sessions yet — open one in Registration.</div>'; return; }
     const isDirector = me && me.role==="director";
     const active = reportFieldKeys.map(k=>REPORT_FIELD_DEFS.find(f=>f.key===k)).filter(Boolean);
+    const details = active.filter(f=>f.kind==="detail");
+    const stats = active.filter(f=>f.kind==="stat");
+    const notesField = active.find(f=>f.kind==="notes");
     $("report-doc").innerHTML = `
-      <div class="rh"><div><h4>Next Steps — Session Report</h4><div class="mono" style="font-size:10px;color:#8A90A0;margin-top:3px">RIG CHURCH LAGOS</div></div><img src="images/favicon.png" alt="" style="width:26px;height:26px"></div>
-      ${active.map((f,idx)=>`<div class="report-row"><div class="rk">${idx+1} · ${f.label}</div><div class="rv">${f.view(r,isDirector)}</div></div>`).join("")}`;
+      <div class="rdoc-band">
+        <img src="images/logo.png" alt="Rig Church Lagos">
+        <div><div class="rdoc-title">Session Report</div><div class="rdoc-sub">Next Steps · Rig Church Lagos</div></div>
+      </div>
+      ${details.length?`<div class="rdoc-fields">${details.map(f=>`<div class="report-row"><div class="rk">${f.label}</div><div class="rv">${f.view(r,isDirector)}</div></div>`).join("")}</div>`:""}
+      ${stats.length?`<div class="rdoc-stats">${stats.map(f=>`<div class="stat"><div class="k">${f.label}</div><div class="v">${f.num(r)}</div></div>`).join("")}</div>`:""}
+      ${notesField?`<div class="rdoc-notes"><span class="rk">${notesField.label}</span>${notesField.view(r,isDirector)}</div>`:""}`;
     $("btn-save-notes").onclick = async ()=>{
       const upd = {};
       if(reportFieldKeys.includes("notes") && $("report-notes")) upd.notes = $("report-notes").value;
@@ -1310,9 +1356,21 @@ tr.row-click:hover td{background:#FBF9F4}
   };
   async function renderSupport(){
     const { data, error } = await db.from("v_support_people").select("*").order("full_name");
-    const list = data||[];
-    const box = $("support-list");
-    if(error){ box.innerHTML = '<div class="empty">Couldn\'t load — check your access.</div>'; return; }
+    const groups = { hc:[], followup:[], membership:[] };
+    if(!error){
+      (data||[]).forEach(p=>{
+        if(p.reason==="awaiting_followup" || p.reason==="noshow") groups.followup.push(p);
+        else if(p.reason==="membership_pipeline" || p.reason==="member") groups.membership.push(p);
+        else groups.hc.push(p); // house_church, and the (unreachable in practice) "other" fallback
+      });
+    }
+    renderSupportGroup("support-list-hc", groups.hc, !!error);
+    renderSupportGroup("support-list-followup", groups.followup, !!error);
+    renderSupportGroup("support-list-membership", groups.membership, !!error);
+  }
+  function renderSupportGroup(containerId, list, hadError){
+    const box = $(containerId);
+    if(hadError){ box.innerHTML = '<div class="empty">Couldn\'t load — check your access.</div>'; return; }
     box.innerHTML = list.length ? list.map(p=>{
       const [bc,bt] = SUPPORT_REASON[p.reason]||SUPPORT_REASON.other;
       return `<div class="fu-item" style="flex-direction:column;align-items:stretch">
@@ -1332,7 +1390,7 @@ tr.row-click:hover td{background:#FBF9F4}
           </div>
         </div>
       </div>`;
-    }).join("") : '<div class="empty">No one needs your attention right now. 🎉</div>';
+    }).join("") : '<div class="empty">No one here right now. 🎉</div>';
 
     box.querySelectorAll("[data-addnote]").forEach(b=>b.addEventListener("click", ()=>addNote(b.dataset.addnote)));
     box.querySelectorAll(".note-add input").forEach(inp=>{

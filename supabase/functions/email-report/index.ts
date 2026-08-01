@@ -57,27 +57,44 @@ Deno.serve(async (req) => {
     const date = new Date(r.session_date + "T00:00:00")
       .toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 
-    // Same field set and order as the Reports pane's "Customize fields" —
-    // read the director's saved choice so the email always matches what's
-    // shown on screen. Falls back to all seven if nothing's been set.
-    const FIELD_DEFS: Record<string, { label: string; value: () => string }> = {
-      session_date: { label: "Session date", value: () => date },
-      step: { label: "Step facilitated", value: () => `Step ${r.step} — ${STEP_TITLES[r.step] ?? ""}` },
-      attendance: { label: "Attendance", value: () => `${r.attendance} people` },
-      first_timers: { label: "First-timers", value: () => `${r.first_timers} first-timer(s)` },
-      hc_interest: { label: "House church interest", value: () => `${r.hc_interest} interested` },
-      serving_interest: { label: "Serving interest", value: () => `${r.serving_interest} interested` },
-      notes: { label: "Notes", value: () => (r.notes ?? "—").replace(/</g, "&lt;") },
+    // Same field set, order, and grouping as the Reports pane's "Customize
+    // fields" — read the director's saved choice so the email always
+    // matches what's shown on screen. Falls back to all seven if nothing's
+    // been set. "stat" fields render as number cards; "detail"/"notes"
+    // render as plain rows — same split as the on-screen redesign.
+    const FIELD_DEFS: Record<string, { label: string; kind: "detail" | "stat" | "notes"; value: () => string }> = {
+      session_date: { label: "Session date", kind: "detail", value: () => date },
+      step: { label: "Step facilitated", kind: "detail", value: () => `Step ${r.step} — ${STEP_TITLES[r.step] ?? ""}` },
+      attendance: { label: "Attendance", kind: "stat", value: () => String(r.attendance) },
+      first_timers: { label: "First-timers", kind: "stat", value: () => String(r.first_timers) },
+      hc_interest: { label: "House church interest", kind: "stat", value: () => String(r.hc_interest) },
+      serving_interest: { label: "Serving interest", kind: "stat", value: () => String(r.serving_interest) },
+      notes: { label: "Notes", kind: "notes", value: () => (r.notes ?? "—").replace(/</g, "&lt;") },
     };
     const ALL_KEYS = Object.keys(FIELD_DEFS);
     const { data: setting } = await admin.from("app_settings").select("value").eq("key", "report_fields").maybeSingle();
     const savedKeys = Array.isArray(setting?.value) ? setting!.value.filter((k: string) => ALL_KEYS.includes(k)) : [];
     const activeKeys = savedKeys.length ? savedKeys : ALL_KEYS;
+    const details = activeKeys.filter((k: string) => FIELD_DEFS[k].kind === "detail");
+    const stats = activeKeys.filter((k: string) => FIELD_DEFS[k].kind === "stat");
+    const notesKey = activeKeys.find((k: string) => FIELD_DEFS[k].kind === "notes");
 
-    const rows = activeKeys.map((k: string, i: number) => {
-      const f = FIELD_DEFS[k];
-      return `<tr><td style="padding:8px 0;color:#8A90A0;width:180px;vertical-align:top">${i + 1} · ${f.label}</td><td style="padding:8px 0;font-weight:bold">${f.value()}</td></tr>`;
-    }).join("");
+    const detailRows = details.map((k: string) =>
+      `<tr><td style="padding:7px 0;color:#8A90A0;width:180px;vertical-align:top">${FIELD_DEFS[k].label}</td><td style="padding:7px 0;font-weight:bold">${FIELD_DEFS[k].value()}</td></tr>`
+    ).join("");
+    // Two stat cards per table row, email-client-safe (plain table, no CSS grid).
+    let statTable = "";
+    for (let i = 0; i < stats.length; i += 2) {
+      const pair = stats.slice(i, i + 2);
+      const cells = pair.map((k: string) => `
+        <td style="width:50%;padding:6px" valign="top">
+          <div style="border:1px solid #DBD4C4;border-radius:10px;padding:12px 14px">
+            <div style="font-size:9px;letter-spacing:1px;text-transform:uppercase;color:#8A90A0">${FIELD_DEFS[k].label}</div>
+            <div style="font-size:22px;font-weight:900;color:#313743;margin-top:2px">${FIELD_DEFS[k].value()}</div>
+          </div>
+        </td>`).join("");
+      statTable += `<tr>${cells}${pair.length === 1 ? '<td style="width:50%"></td>' : ""}</tr>`;
+    }
 
     const html = `
       <div style="font-family:Arial,sans-serif;max-width:560px;margin:auto;color:#454B59">
@@ -86,7 +103,9 @@ Deno.serve(async (req) => {
         </div>
         <div style="padding:22px 4px 4px">
           <h2 style="margin:0 0 18px;color:#313743">Next Steps — Session Report</h2>
-          <table style="width:100%;font-size:14px;border-collapse:collapse">${rows}</table>
+          ${detailRows ? `<table style="width:100%;font-size:14px;border-collapse:collapse;margin-bottom:${stats.length ? 14 : 0}px">${detailRows}</table>` : ""}
+          ${statTable ? `<table style="width:100%;border-collapse:collapse;margin-bottom:${notesKey ? 14 : 0}px">${statTable}</table>` : ""}
+          ${notesKey ? `<div style="font-size:9px;letter-spacing:1px;text-transform:uppercase;color:#8A90A0;margin-bottom:4px">${FIELD_DEFS[notesKey].label}</div><div style="font-size:14px">${FIELD_DEFS[notesKey].value()}</div>` : ""}
           <p style="font-size:11px;color:#A8ADB9;margin-top:24px">Sent automatically by the Next Steps platform when the session was closed.</p>
         </div>
       </div>`;
