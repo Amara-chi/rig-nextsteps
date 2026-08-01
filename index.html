@@ -528,6 +528,7 @@ tr.row-click:hover td{background:#FBF9F4}
   let me = null;            // {id, full_name, role}
   let people = [];          // v_people_progress rows
   let openSession = null;   // today's open session
+  let renderedSessionId = "__unset__"; // guards renderSessionState from rebuilding the video/QR every poll — see loadOpenSession()
   let pollTimer = null;
 
   /* ---------------- helpers ---------------- */
@@ -715,7 +716,16 @@ tr.row-click:hover td{background:#FBF9F4}
   async function loadOpenSession(){
     const { data } = await db.from("sessions").select("*").eq("session_date", todayStr()).eq("is_open", true).order("created_at",{ascending:false}).limit(1);
     openSession = (data && data[0]) || null;
-    renderSessionState();
+    // Only rebuild the video/QR/etc. when the open session actually changes —
+    // this runs every 10s via refreshLive(), and rebuilding sess-player's
+    // innerHTML every time was restarting the embedded video (YouTube iframe
+    // included) from scratch on every poll. The live "Arriving now" feed still
+    // updates every poll regardless, via refreshLive()'s own renderSessionFeed() call.
+    const currentId = openSession ? openSession.id : null;
+    if(currentId !== renderedSessionId){
+      renderedSessionId = currentId;
+      renderSessionState();
+    }
   }
   async function todaysCheckins(){
     const { data } = await db.from("checkins")
