@@ -186,6 +186,8 @@ tr.row-click:hover td{background:#FBF9F4}
 .fu-item:last-child{border-bottom:none}
 .fu-msg{margin-top:7px;padding:10px 13px;border-radius:4px 13px 13px 13px;background:var(--cream);font-size:12px;color:#5A6070;max-width:52ch;border:1px solid var(--line)}
 .fu-actions{margin-left:auto;display:flex;gap:7px;flex:none;flex-wrap:wrap}
+.role-select{padding:9px 12px;border:1.5px solid var(--line);border-radius:10px;background:#fff;font-size:12.5px;font-family:inherit;color:var(--ink-deep)}
+.role-select:focus{outline:none;border-color:var(--orange);box-shadow:0 0 0 3px var(--orange-soft)}
 .script-box{padding:13px 15px;border-left:3px solid var(--orange);background:var(--cream);border-radius:0 12px 12px 0;font-size:12px;color:#5A6070;font-style:italic;margin:10px 0}
 
 /* reports */
@@ -1500,13 +1502,18 @@ tr.row-click:hover td{background:#FBF9F4}
     try{ const ctx = await error.context.json(); if(ctx && ctx.error) code = ctx.error; }catch(e){}
     return { ok:false, error: code };
   }
+  // Must match manage-staff's SUPER_ADMIN_EMAIL — this only controls whether
+  // the controls are OFFERED in the UI; the actual permission is enforced
+  // server-side regardless of what this says.
+  const SUPER_ADMIN_EMAIL = "adewale.jody@gmail.com";
   async function renderTeam(){
     const box = $("team-list");
     const { data, error } = await db.from("profiles").select("id, full_name, email, role, created_at").order("created_at");
     if(error){ box.innerHTML = '<div class="empty">Couldn\'t load — check your access.</div>'; return; }
     const rows = data||[];
+    const isSuperAdmin = (me.email||"").toLowerCase()===SUPER_ADMIN_EMAIL;
     box.innerHTML = rows.map(r=>{
-      const locked = r.id===me.id || r.role==="director";
+      const locked = r.id===me.id || (r.role==="director" && !isSuperAdmin);
       return `<div class="fu-item">
         <div class="avatar">${initials(r.full_name||r.email)}</div>
         <div style="flex:1;min-width:220px">
@@ -1516,7 +1523,7 @@ tr.row-click:hover td{background:#FBF9F4}
         <div class="fu-actions">
           ${locked
             ? `<span class="badge ${ROLE_BADGE[r.role]}">${ROLE_LABEL[r.role]}</span>`
-            : `<select data-setrole="${r.id}">${Object.keys(ROLE_LABEL).map(k=>`<option value="${k}" ${k===r.role?"selected":""}>${ROLE_LABEL[k]}</option>`).join("")}</select>
+            : `<select class="role-select" data-setrole="${r.id}">${Object.keys(ROLE_LABEL).map(k=>`<option value="${k}" ${k===r.role?"selected":""}>${ROLE_LABEL[k]}</option>`).join("")}</select>
                <button class="btn-sm outline" style="color:var(--orange-deep)" data-remove="${r.id}" data-nm="${esc(r.full_name||r.email||"")}">Remove</button>`}
         </div>
       </div>`;
