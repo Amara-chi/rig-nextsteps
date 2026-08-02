@@ -38,8 +38,8 @@ window.RIG_CONFIG = {
   // player ("Stream from YouTube instead" / "Play local copy instead",
   // whichever fits), in case the primary source buffers or won't play.
   STEPS: [
-    { n: 1, title: "Why God Put You on the Earth", video: "Session 1 — Encounter & Identity",              url: "https://youtu.be/ak45wQUWpTo", fallbackUrl: "/videos/session-1.mp4" },
-    { n: 2, title: "The House You're Walking Into", video: "Session 2 — Vision, Mission & Values",         url: "https://youtu.be/A6-clb0SnvA", fallbackUrl: "/videos/session-2.mp4" },
+    { n: 1, title: "Why God Put You on the Earth", video: "Session 1 — Encounter & Identity",              url: "https://youtu.be/A6-clb0SnvA", fallbackUrl: "/videos/session-1.mp4" },
+    { n: 2, title: "The House You're Walking Into", video: "Session 2 — Vision, Mission & Values",         url: "https://youtu.be/ak45wQUWpTo", fallbackUrl: "/videos/session-2.mp4" },
     { n: 3, title: "Find Your Place",               video: "Session 3 — Gifts, Serving & Community",       url: "https://youtu.be/ZVNXobWbjL0", fallbackUrl: "/videos/session-3.mp4" },
     { n: 4, title: "All In",                        video: "Session 4 — Covenant, Commitment & Commissioning", url: "https://youtu.be/I4sA1zJiIPc" }
   ],
