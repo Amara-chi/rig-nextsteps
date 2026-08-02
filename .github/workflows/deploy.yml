@@ -35,7 +35,7 @@ jobs:
         run: |
           rm -rf /tmp/stage
           mkdir -p /tmp/stage/checkin
-          cp index.html config.js /tmp/stage/
+          cp index.html config.js .htaccess /tmp/stage/
           cp checkin/index.html /tmp/stage/checkin/
           cp -r images /tmp/stage/images
           cd /tmp/stage && zip -r /tmp/deploy.zip .
