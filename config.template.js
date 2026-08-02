@@ -34,10 +34,16 @@ window.RIG_CONFIG = {
   // Paste each step's video into "url" — YouTube (unlisted is fine), Vimeo,
   // or a direct video file path (e.g. "/videos/session-1.mp4") if the file
   // is hosted on this server instead. It will play inside Session Mode on the TV.
+  // Optional "youtubeUrl": when "url" is a self-hosted file, this shows a
+  // "Stream from YouTube instead" button that pops the YouTube version up
+  // on screen as a fallback (e.g. if the local file buffers or won't play).
   STEPS: [
-    { n: 1, title: "Why God Put You on the Earth", video: "Session 1 — Encounter & Identity",              url: "https://youtu.be/ak45wQUWpTo" },
-    { n: 2, title: "The House You're Walking Into", video: "Session 2 — Vision, Mission & Values",         url: "https://youtu.be/A6-clb0SnvA" },
-    { n: 3, title: "Find Your Place",               video: "Session 3 — Gifts, Serving & Community",       url: "https://youtu.be/ZVNXobWbjL0" },
+    { n: 1, title: "Why God Put You on the Earth", video: "Session 1 — Encounter & Identity",              url: "/videos/session-1.mp4", youtubeUrl: "https://youtu.be/ak45wQUWpTo" },
+    { n: 2, title: "The House You're Walking Into", video: "Session 2 — Vision, Mission & Values",         url: "/videos/session-2.mp4", youtubeUrl: "https://youtu.be/A6-clb0SnvA" },
+    { n: 3, title: "Find Your Place",               video: "Session 3 — Gifts, Serving & Community",       url: "/videos/session-3.mp4", youtubeUrl: "https://youtu.be/ZVNXobWbjL0" },
+    // n:4 stays on YouTube for now — self-hosted upload for this one is still
+    // in progress (hit a couple of connection resets); switch its "url" to
+    // "/videos/session-4.mp4" once that upload succeeds and is verified live.
     { n: 4, title: "All In",                        video: "Session 4 — Covenant, Commitment & Commissioning", url: "https://youtu.be/I4sA1zJiIPc" }
   ],
 

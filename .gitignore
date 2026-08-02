@@ -3,3 +3,6 @@ config.js
 .vscode/
 supabase/.branches/
 supabase/.temp/
+
+# Session videos are multi-GB and uploaded straight to Hostinger, never through git.
+videos/
