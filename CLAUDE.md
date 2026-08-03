@@ -16,11 +16,13 @@ follow-ups, and generate reports.
 
 ## File map
 - `index.html` — staff app, served at the domain root (`nextsteps.rigchurchlagos.org/`): login
-  (plus a set-password screen for invite/recovery links), Today dashboard, Registration (QR +
-  video + live arrivals), People (journey, notes, editing), Follow-Up Centre (3 stages),
-  Reports (customizable fields via `app_settings.report_fields`, below, plus ad-hoc one-off
-  fields per session via `sessions.custom_fields` — "Add a field" for anything not worth a
-  permanent one), Team (director only)
+  (plus a set-password screen for invite/recovery links), Today dashboard, Check-in (QR + live
+  arrivals — no video; renamed from "Registration" 3 Aug 2026), Videos (all 4 steps and their
+  teaching videos, always visible, for reference/catch-up — not tied to today's session),
+  People (journey, notes, editing), Follow-Up Centre (3 stages), Reports (customizable fields
+  via `app_settings.report_fields`, below, plus ad-hoc one-off fields per session via
+  `sessions.custom_fields` — "Add a field" for anything not worth a permanent one), Team
+  (director only)
 - `checkin/index.html` — visitor check-in form (public, mobile-first, offline queue via
   localStorage, kiosk mode via `?kiosk=1` which auto-resets after each check-in), served at
   `nextsteps.rigchurchlagos.org/checkin` — this is the URL the Sunday QR code must point to

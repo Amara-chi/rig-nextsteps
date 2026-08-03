@@ -371,7 +371,7 @@ tr.row-click:hover td{background:#FBF9F4}
 
     <!-- SESSION -->
     <section class="pane" id="pane-session">
-      <div class="page-head"><div><div class="crumb"><button type="button" class="crumb-link" data-pane="session">Today</button> / Registration</div><h1>Registration</h1><p>Open today's step, put the QR on the TV, watch people arrive.</p></div></div>
+      <div class="page-head"><div><div class="crumb"><button type="button" class="crumb-link" data-pane="session">Today</button> / Check-in</div><h1>Check-in</h1><p>Open today's step, put the QR on the TV, watch people arrive.</p></div></div>
       <div id="sess-setup" class="dir-only">
         <div class="card"><div class="card-head"><div><h3>Which step is running today?</h3></div></div>
           <div class="sess-pick" id="sess-pick"></div>
@@ -388,7 +388,6 @@ tr.row-click:hover td{background:#FBF9F4}
               <div class="q">Scan to check in</div>
               <div class="s" id="qr-url">—</div>
             </div>
-            <div id="sess-player"></div>
             <button class="btn dir-only" style="margin-top:16px" id="btn-end-session">End session &amp; go to report</button>
           </div>
           <div class="card" style="margin-bottom:0">
@@ -397,6 +396,12 @@ tr.row-click:hover td{background:#FBF9F4}
           </div>
         </div>
       </div>
+    </section>
+
+    <!-- VIDEOS -->
+    <section class="pane" id="pane-videos">
+      <div class="page-head"><div><div class="crumb"><button type="button" class="crumb-link" data-pane="today">Today</button> / Videos</div><h1>Videos</h1><p>Each step's teaching video, for reference or catching up.</p></div></div>
+      <div id="videos-list"></div>
     </section>
 
     <!-- PEOPLE -->
@@ -565,6 +570,42 @@ tr.row-click:hover td{background:#FBF9F4}
   function isDirectVideo(url){
     return /\.(mp4|webm|ogv|ogg|mov|m4v)(\?.*)?$/i.test(url||"");
   }
+  // Shared by the Videos page (all 4 steps at once, so never autoplay).
+  function stepPlayerHTML(step, uid){
+    const rawUrl = step.url;
+    const fallbackUrl = step.fallbackUrl;
+    if(!rawUrl) return `<div class="video-hint">No video linked for this step yet. Add a YouTube/Vimeo link, or a direct video file path (e.g. /videos/session-1.mp4), for Step ${step.n} in <b>config.js</b> and it will play right here.</div>`;
+    const primary = isDirectVideo(rawUrl)
+      ? `<div class="video-embed"><video id="vid-${uid}" src="${rawUrl}" controls playsinline></video>
+         <button class="video-fs-btn" data-fs="${uid}" title="Full screen" aria-label="Full screen">
+           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 00-2 2v3M16 3h3a2 2 0 012 2v3M8 21H5a2 2 0 01-2-2v-3M16 21h3a2 2 0 002-2v-3"/></svg>
+         </button></div>`
+      : `<div class="video-embed"><iframe src="${toEmbed(rawUrl)}" title="${esc(step.video)}" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe></div>`;
+    const fallbackBtn = fallbackUrl
+      ? `<button class="btn-sm outline" style="margin-top:10px" data-fallback="${fallbackUrl}">${isDirectVideo(fallbackUrl) ? "Play local copy instead" : "Stream from YouTube instead"}</button>`
+      : "";
+    return primary + fallbackBtn;
+  }
+  function renderVideosPage(){
+    $("videos-list").innerHTML = CFG.STEPS.map((s,i)=>`
+      <div class="card">
+        <div class="card-head"><div><h3>Step ${s.n} — ${esc(s.title)}</h3><div class="sub">${esc(s.video)}</div></div></div>
+        ${stepPlayerHTML(s, "v"+i)}
+      </div>`).join("");
+    CFG.STEPS.forEach((s,i)=>{
+      const fsBtn = document.querySelector(`[data-fs="v${i}"]`);
+      if(fsBtn) fsBtn.addEventListener("click", ()=>{
+        const v = $("vid-v"+i);
+        if(!v) return;
+        if(v.requestFullscreen) v.requestFullscreen();
+        else if(v.webkitRequestFullscreen) v.webkitRequestFullscreen();
+        else if(v.webkitEnterFullscreen) v.webkitEnterFullscreen();
+      });
+    });
+    $("videos-list").querySelectorAll("[data-fallback]").forEach(b=>{
+      b.addEventListener("click", ()=>openFallbackPlayer(b.dataset.fallback));
+    });
+  }
   let modalOnSave = null;
   function openModal(title, sub, bodyHTML, saveLabel, onSave){
     $("modal-title").textContent = title;
@@ -605,7 +646,8 @@ tr.row-click:hover td{background:#FBF9F4}
   /* ---------------- navigation ---------------- */
   const NAV_FULL = [
     {id:"today",   label:"Today",       icon:'<path d="M3 12l9-9 9 9M5 10v10h5v-6h4v6h5V10"/>'},
-    {id:"session", label:"Registration",icon:'<rect x="2" y="4" width="20" height="14" rx="2"/><path d="M8 21h8M10 9l5 3-5 3z"/>'},
+    {id:"session", label:"Check-in",    icon:'<rect x="2" y="4" width="20" height="14" rx="2"/><path d="M8 21h8M10 9l5 3-5 3z"/>'},
+    {id:"videos",  label:"Videos",      icon:'<circle cx="12" cy="12" r="9"/><path d="M10 8l6 4-6 4z"/>'},
     {id:"people",  label:"People",      icon:'<path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/><circle cx="9" cy="7" r="4"/>'},
     {id:"followup",label:"Follow-Up",   icon:'<path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/>', cnt:true},
     {id:"reports", label:"Reports",     icon:'<path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8zM14 2v6h6M16 13H8M16 17H8"/>'}
@@ -712,7 +754,7 @@ tr.row-click:hover td{background:#FBF9F4}
       : "Leadership · read-only";
     $("u-avatar").textContent = initials(me.full_name);
     $("login").style.display="none"; $("app").style.display="block";
-    buildNav(); buildSessionPicker();
+    buildNav(); buildSessionPicker(); renderVideosPage();
     await refreshAll();
     clearInterval(pollTimer);
     pollTimer = setInterval(refreshLive, 10000);
@@ -807,32 +849,6 @@ tr.row-click:hover td{background:#FBF9F4}
     if(live){
       $("sess-title").textContent = `Step ${openSession.step} — ${stepOf(openSession.step).title}`;
       $("sess-video").textContent = stepOf(openSession.step).video;
-      const rawUrl = stepOf(openSession.step).url;
-      const fallbackUrl = stepOf(openSession.step).fallbackUrl;
-      $("sess-player").innerHTML = !rawUrl
-        ? `<div class="video-hint">No video linked for this step yet. Add a YouTube/Vimeo link, or a direct video file path (e.g. /videos/session-1.mp4), for Step ${openSession.step} in <b>config.js</b> and it will play right here.</div>`
-        : isDirectVideo(rawUrl)
-          ? `<div class="video-embed"><video id="sess-video-el" src="${rawUrl}" controls autoplay playsinline></video>
-             <button class="video-fs-btn" id="btn-video-fs" title="Full screen" aria-label="Full screen">
-               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 00-2 2v3M16 3h3a2 2 0 012 2v3M8 21H5a2 2 0 01-2-2v-3M16 21h3a2 2 0 002-2v-3"/></svg>
-             </button></div>`
-          : `<div class="video-embed"><iframe src="${toEmbed(rawUrl)}" title="Session video" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe></div>`;
-      const fsBtn = $("btn-video-fs");
-      if(fsBtn) fsBtn.addEventListener("click", ()=>{
-        const v = $("sess-video-el");
-        if(!v) return;
-        if(v.requestFullscreen) v.requestFullscreen();
-        else if(v.webkitRequestFullscreen) v.webkitRequestFullscreen();
-        else if(v.webkitEnterFullscreen) v.webkitEnterFullscreen();
-      });
-      if(fallbackUrl){
-        const btn = document.createElement("button");
-        btn.className = "btn-sm outline";
-        btn.style.marginTop = "10px";
-        btn.textContent = isDirectVideo(fallbackUrl) ? "Play local copy instead" : "Stream from YouTube instead";
-        btn.addEventListener("click", ()=>openFallbackPlayer(fallbackUrl));
-        $("sess-player").appendChild(btn);
-      }
       $("qr-url").textContent = CFG.CHECKIN_URL;
       $("qrcode").innerHTML="";
       new QRCode($("qrcode"), { text: CFG.CHECKIN_URL, width: 200, height: 200, colorDark: "#F25125", colorLight: "#FFFFFF", correctLevel: QRCode.CorrectLevel.M });
@@ -1295,7 +1311,7 @@ tr.row-click:hover td{background:#FBF9F4}
   $("report-session").addEventListener("change", e=>renderReportDoc(+e.target.value||0));
   function renderReportDoc(i){
     const r = reportRows[i];
-    if(!r){ $("report-doc").innerHTML='<div class="empty">No sessions yet — open one in Registration.</div>'; return; }
+    if(!r){ $("report-doc").innerHTML='<div class="empty">No sessions yet — open one in Check-in.</div>'; return; }
     const isDirector = me && me.role==="director";
     const active = reportFieldKeys.map(k=>REPORT_FIELD_DEFS.find(f=>f.key===k)).filter(Boolean);
     const details = active.filter(f=>f.kind==="detail");
