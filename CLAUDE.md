@@ -28,6 +28,8 @@ follow-ups, and generate reports.
   `nextsteps.rigchurchlagos.org/checkin` — this is the URL the Sunday QR code must point to
   (`config.js`'s `CHECKIN_URL`)
 - `config.js` — all configuration; placeholders in repo, real values only on the server
+- `.htaccess` — forces no-cache/must-revalidate on `.html`/`.js` files; see "Deploy & caching
+  gotchas" below. Must stay in `deploy.yml`'s packaging step or it deploys silently without it.
 - `images/` — brand assets: `logo.png` (dark text, for light backgrounds), `logo-light.png`
   (white text, for dark backgrounds like the sidebar), `favicon.png` (icon mark only, used as
   the browser tab icon and anywhere a small square mark is needed)
@@ -141,6 +143,26 @@ Three staff roles, checked by `public.is_director()` / `is_leader()` / `is_suppo
   with CDN scripts route-mocked, or — for real coverage — pointed at the local stack above and
   signed in as each role. Assert flows, not pixels.
 - Check `node --check` on extracted inline scripts after edits.
+
+## Deploy & caching gotchas
+- Hostinger's CDN (`hcdn`) fronts the site across multiple edge nodes. The deploy workflow
+  calls `hosting_clearWebsiteCacheV1` after every deploy, but in practice that purge does not
+  reliably reach every edge — some kept serving a `config.js` cached under an old policy for
+  days after later deploys, while others were fresh. Confirmed by hitting the same URL
+  repeatedly and comparing `x-hcdn-request-id`/`x-hcdn-cache-status`/`Age` response headers.
+- `.htaccess` (deployed, not just committed — `deploy.yml`'s packaging step must copy it into
+  the zip) sets `Cache-Control: no-cache, must-revalidate` on `.html`/`.js` files, so browsers
+  always revalidate rather than trusting a long `max-age`.
+- Belt-and-suspenders on top of that: `index.html` and `checkin/index.html` load
+  `config.js?v=__BUILD_ID__` — a literal placeholder in the committed source. `deploy.yml`'s
+  packaging step `sed`-replaces it with `$GITHUB_SHA` on the *staged* copy only (same pattern
+  as `config.template.js` → `config.js`, never touching the git-tracked file). Every deploy
+  therefore requests a `config.js` URL no CDN edge has ever cached before, so a real change is
+  guaranteed to show up without depending on the purge step actually working everywhere.
+- When verifying a fix is live, don't trust one `curl` — an edge that already has a stale
+  cached copy won't re-check the origin until that entry's own TTL expires, so hitting the
+  same endpoint several times (or checking `x-hcdn-cache-status`) is the only way to tell
+  "confirmed live everywhere" from "the one edge I happened to hit is fresh."
 
 ## Known data caveats (documented in person_notes with an [Import] prefix)
 - Some pre-platform session dates are estimates (the old form recorded steps without dates).
