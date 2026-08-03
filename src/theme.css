@@ -1,0 +1,79 @@
+@import "tailwindcss";
+
+/* Design tokens ported 1:1 from the old index.html/checkin/index.html :root
+   blocks (confirmed identical hex values between the two — checkin just uses
+   a subset). See CLAUDE.md for the brand rationale behind these values. */
+@theme {
+  --color-cream: #EFEBE2;
+  --color-cream-deep: #E6E0D2;
+  --color-ink: #454B59;
+  --color-ink-deep: #313743;
+  --color-orange: #F25125;
+  --color-orange-deep: #D8431B;
+  --color-orange-soft: #FCE0D6;
+  --color-line: #DBD4C4;
+  --color-green: #2F8A5B;
+  --color-green-soft: #DCEDE3;
+
+  /* Repeated-but-previously-undeclared greys, named by where they show up. */
+  --color-muted-label: #8A90A0;
+  --color-muted-sub: #7A8090;
+  --color-muted-faint: #A8ADB9;
+  --color-muted-body: #5A6070;
+  --color-muted-icon: #B6BCC8;
+  --color-nav-idle: #AAB0BE;
+  --color-nav-faint: #8B92A2;
+
+  /* Checkin-only one-offs. */
+  --color-checkin-lead: #6A7080;
+  --color-amber-text: #8A6A1F;
+  --color-amber-bg: #FFF6E8;
+  --color-amber-border: #EBD9B4;
+  --color-welcome-border: #BFDCCB;
+
+  /* Journey pipeline bar chart's 5-step ramp — deterministic color-mix, so
+     this is a real token, not an approximation of one. */
+  --color-pipeline-1: color-mix(in srgb, var(--color-orange) 16%, var(--color-cream-deep));
+  --color-pipeline-2: color-mix(in srgb, var(--color-orange) 36%, var(--color-cream-deep));
+  --color-pipeline-3: color-mix(in srgb, var(--color-orange) 56%, var(--color-cream-deep));
+  --color-pipeline-4: color-mix(in srgb, var(--color-orange) 78%, var(--color-cream-deep));
+  --color-pipeline-5: var(--color-orange);
+
+  /* The "arch" motif from the logo — border-radius accepts this as a valid
+     four-value shorthand, so rounded-arch is a single real utility. */
+  --radius-arch: 999px 999px 12px 12px;
+
+  --shadow-card: 0 2px 6px rgba(69, 75, 89, .07), 0 12px 32px rgba(69, 75, 89, .08);
+  --shadow-modal: 0 30px 80px rgba(0, 0, 0, .3);
+  --shadow-toast: 0 14px 40px rgba(0, 0, 0, .25);
+  --shadow-focus: 0 0 0 3px var(--color-orange-soft);
+
+  --font-sans: 'Archivo', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', monospace;
+
+  /* Admin's pane/modal fade and checkin's fade are genuinely different
+     (6px/8px, .25s/.2s vs .3s) — kept distinct on purpose, not unified. */
+  --animate-fade: fade .25s ease;
+  --animate-fade-fast: fade .2s ease;
+  --animate-fade-checkin: fade-checkin .3s ease;
+  /* Named explicitly rather than reusing Tailwind's built-in animate-pulse,
+     which defaults to different timing/opacity values. */
+  --animate-pulse-slow: pulse-brand 1.6s infinite;
+}
+
+@keyframes fade {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes fade-checkin {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes pulse-brand {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .35; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}

@@ -6,3 +6,10 @@ supabase/.temp/
 
 # Session videos are multi-GB and uploaded straight to Hostinger, never through git.
 videos/
+
+# Vite/React app (vite-migration)
+node_modules/
+dist/
+.env
+.env.local
+.env.*.local
