@@ -36,14 +36,34 @@ function extractJson(result) {
   }
 }
 
+// The GitHub Actions runner <-> Hostinger connection has hit transient
+// network failures (ETIMEDOUT/ENETUNREACH) more than once in practice,
+// failing an otherwise-fine deploy. Retrying the same call is safe here:
+// the failures observed happened before any bytes were sent ("Pre-upload
+// request failed"), so nothing has been partially applied server-side.
+async function withRetry(label, fn, attempts = 3) {
+  for (let i = 1; i <= attempts; i++) {
+    try {
+      return await fn();
+    } catch (err) {
+      if (i === attempts) throw err;
+      console.error(`${label} failed (attempt ${i}/${attempts}): ${err?.message || err}`);
+      console.log(`Retrying ${label} in 10s ...`);
+      await new Promise((r) => setTimeout(r, 10000));
+    }
+  }
+}
+
 try {
   await client.connect(transport);
 
   console.log(`Deploying ${archivePath} -> ${domain} ...`);
-  const deployResult = await client.callTool({
-    name: "hosting_deployStaticWebsite",
-    arguments: { domain, archivePath, removeArchive: true },
-  });
+  const deployResult = await withRetry("Deploy", () =>
+    client.callTool({
+      name: "hosting_deployStaticWebsite",
+      arguments: { domain, archivePath, removeArchive: true },
+    })
+  );
   const parsed = extractJson(deployResult);
   console.log("Deploy result:", JSON.stringify(parsed, null, 2));
 
@@ -57,10 +77,12 @@ try {
   }
 
   console.log("Clearing website cache ...");
-  const cacheResult = await client.callTool({
-    name: "hosting_clearWebsiteCacheV1",
-    arguments: { domain },
-  });
+  const cacheResult = await withRetry("Cache clear", () =>
+    client.callTool({
+      name: "hosting_clearWebsiteCacheV1",
+      arguments: { domain },
+    })
+  );
   console.log("Cache clear result:", JSON.stringify(extractJson(cacheResult), null, 2));
 
   console.log("Deploy succeeded.");
