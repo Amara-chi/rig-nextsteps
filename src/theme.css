@@ -4,6 +4,11 @@
    blocks (confirmed identical hex values between the two — checkin just uses
    a subset). See CLAUDE.md for the brand rationale behind these values. */
 @theme {
+  /* Custom breakpoints matching the old app's exact media-query cutoffs
+     (760px: sidebar <-> bottom-nav; 900px: two-col grids collapse to one). */
+  --breakpoint-mobile: 760px;
+  --breakpoint-tablet: 900px;
+
   --color-cream: #EFEBE2;
   --color-cream-deep: #E6E0D2;
   --color-ink: #454B59;
