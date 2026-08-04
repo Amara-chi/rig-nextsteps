@@ -33,6 +33,8 @@ export const STEPS = [
   { n: 4, title: 'All In', video: 'Session 4 — Covenant, Commitment & Commissioning', url: 'https://youtu.be/I4sA1zJiIPc' },
 ]
 
+export const stepOf = (n) => STEPS[n - 1] || { title: '?', video: '' }
+
 // Follow-up message templates. [Name] and [Step] are filled in automatically.
 export const MSG_ATTENDED = 'Hi [Name], it was great meeting you today at Step [Step]. Really glad you came. Looking forward to seeing you next Sunday!'
 export const MSG_COMPLETED = "[Name], congratulations on completing Next Steps! We're celebrating you. Someone from leadership will be in touch about what comes next."

@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useAuth } from './hooks/useAuth.js'
 import { useToast } from './hooks/useToast.js'
+import { useAppData } from './hooks/useAppData.js'
 import { MeProvider } from './context/MeContext.jsx'
 import { NAV_FULL, NAV_SUPPORT, NAV_TEAM } from './nav.jsx'
 import Login from './auth/Login.jsx'
@@ -31,6 +32,7 @@ const BASE_CLASS = 'min-h-dvh font-sans bg-cream text-ink text-[15px] leading-[1
 export default function App() {
   const { status, me, authLinkType, signIn, setPassword, signOut } = useAuth()
   const { html: toastHtml, visible: toastVisible, toast } = useToast()
+  const { people, openSession, todaysCheckins } = useAppData(me)
   const [fallbackUrl, setFallbackUrl] = useState(null)
 
   const nav = useMemo(() => {
@@ -56,7 +58,7 @@ export default function App() {
           <main className="flex-1 pt-7.5 px-9 pb-22.5 max-mobile:pt-5 max-mobile:px-4 max-mobile:pb-24 max-w-290 w-full">
             {me.role !== 'director' && <ReadonlyBanner />}
 
-            <Pane active={pane === 'today'}><Today /></Pane>
+            <Pane active={pane === 'today'}><Today people={people} openSession={openSession} todaysCheckins={todaysCheckins} /></Pane>
             <Pane active={pane === 'session'}><SessionPane onNavigate={setActivePane} /></Pane>
             <Pane active={pane === 'videos'}><VideosPage onNavigate={setActivePane} onFallback={setFallbackUrl} /></Pane>
             <Pane active={pane === 'people'}><People /></Pane>
