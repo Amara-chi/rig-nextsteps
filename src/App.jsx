@@ -58,7 +58,7 @@ export default function App() {
 
             <Pane active={pane === 'today'}><Today /></Pane>
             <Pane active={pane === 'session'}><SessionPane onNavigate={setActivePane} /></Pane>
-            <Pane active={pane === 'videos'}><VideosPage onNavigate={setActivePane} /></Pane>
+            <Pane active={pane === 'videos'}><VideosPage onNavigate={setActivePane} onFallback={setFallbackUrl} /></Pane>
             <Pane active={pane === 'people'}><People /></Pane>
             <Pane active={pane === 'followup'}><FollowUp /></Pane>
             <Pane active={pane === 'reports'}><Reports /></Pane>
