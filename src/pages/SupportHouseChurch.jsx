@@ -1,10 +1,11 @@
 import PageHead from '../components/PageHead.jsx'
+import SupportPersonList from '../components/SupportPersonList.jsx'
 
-export default function SupportHouseChurch() {
+export default function SupportHouseChurch({ list, hadError, refresh }) {
   return (
     <>
       <PageHead title="House Church" sub="Everyone who's expressed interest." />
-      <div className="text-muted-faint text-sm">House Church pane — coming soon.</div>
+      <SupportPersonList list={list} context="hc" hadError={hadError} refresh={refresh} />
     </>
   )
 }

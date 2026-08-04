@@ -1,10 +1,11 @@
 import PageHead from '../components/PageHead.jsx'
+import SupportPersonList from '../components/SupportPersonList.jsx'
 
-export default function SupportFollowUp() {
+export default function SupportFollowUp({ list, hadError, refresh }) {
   return (
     <>
       <PageHead title="Follow Up" sub="A pending message, awaiting an outcome, or a no-show." />
-      <div className="text-muted-faint text-sm">Support Follow Up pane — coming soon.</div>
+      <SupportPersonList list={list} context="followup" hadError={hadError} refresh={refresh} />
     </>
   )
 }

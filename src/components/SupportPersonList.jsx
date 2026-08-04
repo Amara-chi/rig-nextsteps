@@ -1,0 +1,132 @@
+import { useState } from 'react'
+import Card from './Card.jsx'
+import Badge from './Badge.jsx'
+import Avatar from './Avatar.jsx'
+import BtnSm from './BtnSm.jsx'
+import NotesThread from './NotesThread.jsx'
+import EmptyState from './EmptyState.jsx'
+import OutcomeModal from './OutcomeModal.jsx'
+import { useMe } from '../context/MeContext.jsx'
+import { useAppToast } from '../context/ToastContext.jsx'
+import { supabase } from '../lib/supabaseClient.js'
+import { fillMsg, fmtPhone, waLink } from '../lib/format.js'
+import { MSG_ATTENDED, MSG_COMPLETED } from '../config/site.js'
+
+const linkBtnClass = 'inline-flex items-center gap-1.5 px-4 py-2.25 rounded-[10px] font-bold text-[12.5px] whitespace-nowrap bg-white border-[1.5px] border-line text-ink hover:border-orange hover:text-orange'
+
+const STATUS_LABEL = { sent: 'Message sent', called: 'Called', texted: 'Texted', door_open: 'Door open' }
+
+function badgeFor(p, context) {
+  if (context === 'hc') return ['orange', 'House church interested']
+  if (context === 'membership') return p.member_since ? ['green', 'Member'] : ['navy', 'Membership pipeline']
+  if (p.is_noshow) return ['grey', 'No-show — needs a call']
+  return ['orange', 'Awaiting follow-up']
+}
+
+// Mirrors the old app's if/else-if chain exactly (mutually exclusive,
+// ordered) — follow-up-specific actions only ever appear on the Follow Up
+// page; House Church and Membership always just offer plain contact.
+function actionKind(p, context) {
+  if (context !== 'followup') return 'plain'
+  if (p.is_awaiting_followup && p.open_followup_status === 'pending') return 'send-first'
+  if (p.is_awaiting_followup) return 'log-followup'
+  if (p.is_noshow) return 'log-noshow'
+  return 'plain'
+}
+
+// Shared by all 3 Support pages (House Church, Follow Up, Membership) —
+// same v_support_people row shape, same notes thread, same contact actions,
+// differing only in which independent boolean selects them and which badge
+// shows. The old app rendered all 3 from one renderSupport() call.
+export default function SupportPersonList({ list, context, hadError, refresh }) {
+  const me = useMe()
+  const toast = useAppToast()
+  const [outcomeState, setOutcomeState] = useState(null)
+
+  const saveOutcomeNote = async (personId, status, text) => {
+    if (!text) return
+    await supabase.from('person_notes').insert({ person_id: personId, author_id: me.id, note: `Follow-up — ${STATUS_LABEL[status] || status}: ${text}` })
+  }
+
+  const sendFirstMessage = async (p) => {
+    const completed = p.steps_done === 4
+    const first = p.full_name.split(' ')[0]
+    const msg = completed ? fillMsg(MSG_COMPLETED, first, p.open_followup_step) : fillMsg(MSG_ATTENDED, first, p.open_followup_step || '')
+    window.open(waLink(p.phone, msg), '_blank', 'noopener')
+    const { error } = await supabase.from('followups').update({ status: 'sent', updated_at: new Date().toISOString() }).eq('id', p.open_followup_id)
+    if (error) { toast("WhatsApp opened, but couldn't log it — check your access."); return }
+    toast('Sent — log the outcome once you hear back.')
+    setTimeout(refresh, 1000)
+  }
+
+  const logFollowupOutcome = async (status, note) => {
+    const { id, personId } = outcomeState
+    const { error } = await supabase.from('followups').update({ status, outcome: note || '(no details logged)', updated_at: new Date().toISOString() }).eq('id', id)
+    if (error) { toast("Couldn't save — check your access."); return false }
+    await saveOutcomeNote(personId, status, note)
+    toast('Outcome logged' + (note ? ' — and saved as a note on their profile.' : '.'))
+    refresh()
+  }
+
+  const logNoshowOutcome = async (status, note) => {
+    const { personId } = outcomeState
+    const { error } = await supabase.from('followups').insert({ person_id: personId, type: 'noshow', status, outcome: note || '(no details logged)' })
+    if (error) { toast("Couldn't save — check your access."); return false }
+    await saveOutcomeNote(personId, status, note)
+    toast('Logged for the record' + (note ? ' — and saved as a note.' : '.'))
+  }
+
+  if (hadError) return <Card className="mb-0"><EmptyState>Couldn't load — check your access.</EmptyState></Card>
+
+  return (
+    <>
+      <Card className="mb-0">
+        {list.length ? list.map((p) => {
+          const [bc, bt] = badgeFor(p, context)
+          const kind = actionKind(p, context)
+          return (
+            <div key={p.id} className="flex flex-col items-stretch gap-3.25 py-3.75 border-b border-[#ECE7DA] last:border-b-0">
+              <div className="flex gap-3.25 items-start flex-wrap">
+                <Avatar name={p.full_name} />
+                <div className="flex-1 min-w-55">
+                  <div className="font-extrabold text-[13px] text-ink-deep">{p.full_name} <Badge variant={bc}>{bt}</Badge></div>
+                  <div className="text-xs text-muted-label mt-0.5">{fmtPhone(p.phone)}{p.email ? ' · ' + p.email : ''}</div>
+                </div>
+                <div className="ml-auto flex gap-1.75 flex-none flex-wrap">
+                  {kind === 'send-first' && <BtnSm onClick={() => sendFirstMessage(p)}>Send on WhatsApp</BtnSm>}
+                  {kind === 'log-followup' && (
+                    <>
+                      <a href={waLink(p.phone, '')} target="_blank" rel="noopener" className={linkBtnClass}>Open chat</a>
+                      <BtnSm onClick={() => setOutcomeState({ kind: 'followup', id: p.open_followup_id, personId: p.id, title: 'Log follow-up outcome', sub: p.full_name, defaultStatus: p.open_followup_status })}>Log outcome</BtnSm>
+                    </>
+                  )}
+                  {kind === 'log-noshow' && (
+                    <>
+                      <a href={waLink(p.phone, '')} target="_blank" rel="noopener" className={linkBtnClass}>Open chat</a>
+                      <BtnSm onClick={() => setOutcomeState({ kind: 'noshow', personId: p.id, title: 'Log no-show follow-up', sub: p.full_name, defaultStatus: 'called' })}>Log outcome</BtnSm>
+                    </>
+                  )}
+                  {kind === 'plain' && (
+                    <>
+                      <a href={`tel:+${p.phone}`} className={linkBtnClass}>Call</a>
+                      <a href={waLink(p.phone, '')} target="_blank" rel="noopener" className={linkBtnClass}>WhatsApp</a>
+                    </>
+                  )}
+                </div>
+              </div>
+              <NotesThread personId={p.id} className="mt-2.5" showLabel={false} />
+            </div>
+          )
+        }) : <EmptyState>No one here right now. 🎉</EmptyState>}
+      </Card>
+      <OutcomeModal
+        open={!!outcomeState}
+        title={outcomeState?.title}
+        sub={outcomeState?.sub}
+        defaultStatus={outcomeState?.defaultStatus}
+        onClose={() => setOutcomeState(null)}
+        onSave={(status, note) => (outcomeState.kind === 'followup' ? logFollowupOutcome(status, note) : logNoshowOutcome(status, note))}
+      />
+    </>
+  )
+}

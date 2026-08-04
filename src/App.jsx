@@ -3,6 +3,7 @@ import { useAuth } from './hooks/useAuth.js'
 import { useToast } from './hooks/useToast.js'
 import { useAppData } from './hooks/useAppData.js'
 import { useFollowUp } from './hooks/useFollowUp.js'
+import { useSupportPeople } from './hooks/useSupportPeople.js'
 import { MeProvider } from './context/MeContext.jsx'
 import { ToastProvider } from './context/ToastContext.jsx'
 import { NAV_FULL, NAV_SUPPORT, NAV_TEAM } from './nav.jsx'
@@ -37,6 +38,7 @@ export default function App() {
   const { html: toastHtml, visible: toastVisible, toast } = toastState
   const { people, openSession, todaysCheckins, sessionFeed, refreshAll } = useAppData(me)
   const followUp = useFollowUp(me, people)
+  const support = useSupportPeople(me)
   const [fallbackUrl, setFallbackUrl] = useState(null)
 
   const nav = useMemo(() => {
@@ -73,9 +75,15 @@ export default function App() {
                 <FollowUp people={people} attended={followUp.attended} awaiting={followUp.awaiting} noshows={followUp.noshows} STATUS_LABEL={followUp.STATUS_LABEL} refresh={followUp.refresh} />
               </Pane>
               <Pane active={pane === 'reports'}><Reports people={people} /></Pane>
-              <Pane active={pane === 'support-hc'}><SupportHouseChurch /></Pane>
-              <Pane active={pane === 'support-followup'}><SupportFollowUp /></Pane>
-              <Pane active={pane === 'support-membership'}><SupportMembership /></Pane>
+              <Pane active={pane === 'support-hc'}>
+                <SupportHouseChurch list={support.hc} hadError={support.hadError} refresh={support.refresh} />
+              </Pane>
+              <Pane active={pane === 'support-followup'}>
+                <SupportFollowUp list={support.followup} hadError={support.hadError} refresh={support.refresh} />
+              </Pane>
+              <Pane active={pane === 'support-membership'}>
+                <SupportMembership list={support.membership} hadError={support.hadError} refresh={support.refresh} />
+              </Pane>
               {me.role === 'director' && <Pane active={pane === 'team'}><Team /></Pane>}
             </main>
             <BottomNav nav={nav} activePane={pane} onNavigate={setActivePane} followupCount={followUp.attended.length} />

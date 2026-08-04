@@ -53,7 +53,12 @@ function NoteItem({ note, canManage, onChanged }) {
   )
 }
 
-export default function NotesThread({ personId }) {
+// className overrides the wrapper's top margin — the old app's default
+// .notes-wrap was margin-top:16px (mt-4), but the Support pages' stacked
+// fu-item layout used an inline override to 10px (mt-2.5) instead. showLabel
+// is false on the Support pages too — their notes-wrap never had the "nk"
+// header, unlike the People pane's person-detail usage.
+export default function NotesThread({ personId, className = 'mt-4', showLabel = true }) {
   const me = useMe()
   const toast = useAppToast()
   const [notes, setNotes] = useState(null)
@@ -80,8 +85,8 @@ export default function NotesThread({ personId }) {
   }
 
   return (
-    <div className="mt-4 border-t border-dashed border-line pt-3">
-      <div className="font-mono text-[9px] tracking-[.1em] uppercase text-muted-label font-semibold mb-2">Notes for staff — action points, prayer points, for the house church leader</div>
+    <div className={`${className} border-t border-dashed border-line pt-3`}>
+      {showLabel && <div className="font-mono text-[9px] tracking-[.1em] uppercase text-muted-label font-semibold mb-2">Notes for staff — action points, prayer points, for the house church leader</div>}
       {notes === null ? (
         <EmptyState>Loading notes…</EmptyState>
       ) : notes.length === 0 ? (
