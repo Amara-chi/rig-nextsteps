@@ -3,6 +3,7 @@ import { useAuth } from './hooks/useAuth.js'
 import { useToast } from './hooks/useToast.js'
 import { useAppData } from './hooks/useAppData.js'
 import { MeProvider } from './context/MeContext.jsx'
+import { ToastProvider } from './context/ToastContext.jsx'
 import { NAV_FULL, NAV_SUPPORT, NAV_TEAM } from './nav.jsx'
 import Login from './auth/Login.jsx'
 import SetPassword from './auth/SetPassword.jsx'
@@ -31,8 +32,9 @@ const BASE_CLASS = 'min-h-dvh font-sans bg-cream text-ink text-[15px] leading-[1
 
 export default function App() {
   const { status, me, authLinkType, signIn, setPassword, signOut } = useAuth()
-  const { html: toastHtml, visible: toastVisible, toast } = useToast()
-  const { people, openSession, todaysCheckins } = useAppData(me)
+  const toastState = useToast()
+  const { html: toastHtml, visible: toastVisible, toast } = toastState
+  const { people, openSession, todaysCheckins, refreshAll } = useAppData(me)
   const [fallbackUrl, setFallbackUrl] = useState(null)
 
   const nav = useMemo(() => {
@@ -52,28 +54,30 @@ export default function App() {
 
   return (
     <MeProvider me={me}>
-      <div className={BASE_CLASS}>
-        <div className="flex min-h-dvh">
-          <Sidebar nav={nav} activePane={pane} onNavigate={setActivePane} me={me} onSignOut={signOut} />
-          <main className="flex-1 pt-7.5 px-9 pb-22.5 max-mobile:pt-5 max-mobile:px-4 max-mobile:pb-24 max-w-290 w-full">
-            {me.role !== 'director' && <ReadonlyBanner />}
+      <ToastProvider value={toastState}>
+        <div className={BASE_CLASS}>
+          <div className="flex min-h-dvh">
+            <Sidebar nav={nav} activePane={pane} onNavigate={setActivePane} me={me} onSignOut={signOut} />
+            <main className="flex-1 pt-7.5 px-9 pb-22.5 max-mobile:pt-5 max-mobile:px-4 max-mobile:pb-24 max-w-290 w-full">
+              {me.role !== 'director' && <ReadonlyBanner />}
 
-            <Pane active={pane === 'today'}><Today people={people} openSession={openSession} todaysCheckins={todaysCheckins} /></Pane>
-            <Pane active={pane === 'session'}><SessionPane onNavigate={setActivePane} /></Pane>
-            <Pane active={pane === 'videos'}><VideosPage onNavigate={setActivePane} onFallback={setFallbackUrl} /></Pane>
-            <Pane active={pane === 'people'}><People /></Pane>
-            <Pane active={pane === 'followup'}><FollowUp /></Pane>
-            <Pane active={pane === 'reports'}><Reports people={people} /></Pane>
-            <Pane active={pane === 'support-hc'}><SupportHouseChurch /></Pane>
-            <Pane active={pane === 'support-followup'}><SupportFollowUp /></Pane>
-            <Pane active={pane === 'support-membership'}><SupportMembership /></Pane>
-            {me.role === 'director' && <Pane active={pane === 'team'}><Team /></Pane>}
-          </main>
-          <BottomNav nav={nav} activePane={pane} onNavigate={setActivePane} />
+              <Pane active={pane === 'today'}><Today people={people} openSession={openSession} todaysCheckins={todaysCheckins} /></Pane>
+              <Pane active={pane === 'session'}><SessionPane onNavigate={setActivePane} /></Pane>
+              <Pane active={pane === 'videos'}><VideosPage onNavigate={setActivePane} onFallback={setFallbackUrl} /></Pane>
+              <Pane active={pane === 'people'}><People people={people} onDataChange={refreshAll} /></Pane>
+              <Pane active={pane === 'followup'}><FollowUp /></Pane>
+              <Pane active={pane === 'reports'}><Reports people={people} /></Pane>
+              <Pane active={pane === 'support-hc'}><SupportHouseChurch /></Pane>
+              <Pane active={pane === 'support-followup'}><SupportFollowUp /></Pane>
+              <Pane active={pane === 'support-membership'}><SupportMembership /></Pane>
+              {me.role === 'director' && <Pane active={pane === 'team'}><Team /></Pane>}
+            </main>
+            <BottomNav nav={nav} activePane={pane} onNavigate={setActivePane} />
+          </div>
+          <Toast html={toastHtml} visible={toastVisible} />
+          <VideoFallbackModal url={fallbackUrl} onClose={() => setFallbackUrl(null)} />
         </div>
-        <Toast html={toastHtml} visible={toastVisible} />
-        <VideoFallbackModal url={fallbackUrl} onClose={() => setFallbackUrl(null)} />
-      </div>
+      </ToastProvider>
     </MeProvider>
   )
 }

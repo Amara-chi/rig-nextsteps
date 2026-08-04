@@ -7,8 +7,8 @@ import Modal from '../components/Modal.jsx'
 import ReportDoc from '../components/ReportDoc.jsx'
 import EmptyState from '../components/EmptyState.jsx'
 import { useMe } from '../context/MeContext.jsx'
+import { useAppToast } from '../context/ToastContext.jsx'
 import { useReports } from '../hooks/useReports.js'
-import { useToast } from '../hooks/useToast.js'
 import { supabase } from '../lib/supabaseClient.js'
 import { downloadCSV } from '../lib/csv.js'
 import { fmtDate, fmtPhone, waLink } from '../lib/format.js'
@@ -51,7 +51,7 @@ function currentRange(kind, customFrom, customTo) {
 export default function Reports({ people }) {
   const me = useMe()
   const isDirector = me?.role === 'director'
-  const { toast } = useToast()
+  const toast = useAppToast()
   const { reportRows, reportFieldKeys, saveReportFields, updateSession, deleteSession, addCustomField, removeCustomField } = useReports()
 
   const [selectedIndex, setSelectedIndex] = useState(0)
