@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { useAuth } from './hooks/useAuth.js'
 import { useToast } from './hooks/useToast.js'
 import { useAppData } from './hooks/useAppData.js'
+import { useFollowUp } from './hooks/useFollowUp.js'
 import { MeProvider } from './context/MeContext.jsx'
 import { ToastProvider } from './context/ToastContext.jsx'
 import { NAV_FULL, NAV_SUPPORT, NAV_TEAM } from './nav.jsx'
@@ -35,6 +36,7 @@ export default function App() {
   const toastState = useToast()
   const { html: toastHtml, visible: toastVisible, toast } = toastState
   const { people, openSession, todaysCheckins, refreshAll } = useAppData(me)
+  const followUp = useFollowUp(me, people)
   const [fallbackUrl, setFallbackUrl] = useState(null)
 
   const nav = useMemo(() => {
@@ -57,7 +59,7 @@ export default function App() {
       <ToastProvider value={toastState}>
         <div className={BASE_CLASS}>
           <div className="flex min-h-dvh">
-            <Sidebar nav={nav} activePane={pane} onNavigate={setActivePane} me={me} onSignOut={signOut} />
+            <Sidebar nav={nav} activePane={pane} onNavigate={setActivePane} me={me} onSignOut={signOut} followupCount={followUp.attended.length} />
             <main className="flex-1 pt-7.5 px-9 pb-22.5 max-mobile:pt-5 max-mobile:px-4 max-mobile:pb-24 max-w-290 w-full">
               {me.role !== 'director' && <ReadonlyBanner />}
 
@@ -65,14 +67,16 @@ export default function App() {
               <Pane active={pane === 'session'}><SessionPane onNavigate={setActivePane} /></Pane>
               <Pane active={pane === 'videos'}><VideosPage onNavigate={setActivePane} onFallback={setFallbackUrl} /></Pane>
               <Pane active={pane === 'people'}><People people={people} onDataChange={refreshAll} /></Pane>
-              <Pane active={pane === 'followup'}><FollowUp /></Pane>
+              <Pane active={pane === 'followup'}>
+                <FollowUp people={people} attended={followUp.attended} awaiting={followUp.awaiting} noshows={followUp.noshows} STATUS_LABEL={followUp.STATUS_LABEL} refresh={followUp.refresh} />
+              </Pane>
               <Pane active={pane === 'reports'}><Reports people={people} /></Pane>
               <Pane active={pane === 'support-hc'}><SupportHouseChurch /></Pane>
               <Pane active={pane === 'support-followup'}><SupportFollowUp /></Pane>
               <Pane active={pane === 'support-membership'}><SupportMembership /></Pane>
               {me.role === 'director' && <Pane active={pane === 'team'}><Team /></Pane>}
             </main>
-            <BottomNav nav={nav} activePane={pane} onNavigate={setActivePane} />
+            <BottomNav nav={nav} activePane={pane} onNavigate={setActivePane} followupCount={followUp.attended.length} />
           </div>
           <Toast html={toastHtml} visible={toastVisible} />
           <VideoFallbackModal url={fallbackUrl} onClose={() => setFallbackUrl(null)} />
