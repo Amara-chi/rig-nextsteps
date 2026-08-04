@@ -12,7 +12,7 @@ export default function Btn({ variant = 'primary', className = '', disabled, chi
     <button
       type="button"
       disabled={disabled}
-      className={`flex items-center justify-center gap-2 w-full py-[15px] rounded-[13px] font-extrabold text-[15px] transition-[.15s] disabled:opacity-55 disabled:cursor-wait ${VARIANTS[variant]} ${className}`}
+      className={`flex items-center justify-center gap-2 w-full py-3.75 rounded-[13px] font-extrabold text-[15px] transition-[.15s] disabled:opacity-55 disabled:cursor-wait ${VARIANTS[variant]} ${className}`}
       {...props}
     >
       {children}

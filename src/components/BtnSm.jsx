@@ -11,7 +11,7 @@ export default function BtnSm({ variant = 'solid', className = '', disabled, chi
     <button
       type="button"
       disabled={disabled}
-      className={`inline-flex items-center gap-1.5 px-4 py-[9px] rounded-[10px] font-bold text-[12.5px] whitespace-nowrap transition-[.15s] disabled:opacity-55 disabled:cursor-wait ${VARIANTS[variant]} ${className}`}
+      className={`inline-flex items-center gap-1.5 px-4 py-2.25 rounded-[10px] font-bold text-[12.5px] whitespace-nowrap transition-[.15s] disabled:opacity-55 disabled:cursor-wait ${VARIANTS[variant]} ${className}`}
       {...props}
     >
       {children}
