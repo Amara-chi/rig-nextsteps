@@ -1,12 +1,17 @@
-# index.html, checkin/index.html and config.js change on almost every deploy
-# and are served under a fixed, unhashed filename — Hostinger's edge was
-# caching config.js for 7 days (both at the CDN and in visitors' browsers),
+# index.html and checkin/index.html change on every deploy but are served
+# under fixed, unhashed filenames — Hostinger's edge was caching them (and
+# the old config.js) for 7 days, both at the CDN and in visitors' browsers,
 # so fixes verified as live via curl were invisible in an actual browser tab
 # for up to a week. "no-cache" still lets the browser keep a local copy, but
 # forces it to revalidate with the server on every load, so a real change is
 # always picked up on next page load without needing a hard refresh.
+#
+# Only .html needs this now (narrowed from .html|js during the React
+# migration): every .js/.css file Vite emits under assets/ is content-hashed,
+# so it never changes post-build — forcing revalidation on those would now be
+# a pure performance regression, not a safety net.
 <IfModule mod_headers.c>
-  <FilesMatch "\.(html|js)$">
+  <FilesMatch "\.html$">
     Header set Cache-Control "no-cache, must-revalidate"
   </FilesMatch>
 </IfModule>

@@ -21,31 +21,21 @@ jobs:
       - name: Install Hostinger MCP server
         run: npm install -g hostinger-api-mcp
 
+      - name: Install app dependencies
+        run: npm ci
+
       - name: Install deploy-tool dependencies
         run: npm install
         working-directory: .github/deploy-tool
 
-      - name: Build real config.js from template + secrets
-        run: node .github/deploy-tool/build-config.mjs
+      - name: Build (Vite)
+        run: npm run build
         env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          VITE_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
 
-      - name: Package static site
-        run: |
-          rm -rf /tmp/stage
-          mkdir -p /tmp/stage/checkin
-          cp index.html config.js .htaccess /tmp/stage/
-          cp checkin/index.html /tmp/stage/checkin/
-          cp -r images /tmp/stage/images
-          # config.js is requested with this version tag on every deploy, so it's
-          # a URL no CDN edge has ever cached before - sidesteps relying on the
-          # Hostinger cache-purge step actually reaching every edge (it doesn't
-          # always, per real-world testing - some edges kept serving a config.js
-          # cached under the old 7-day policy for days after later fixes deployed
-          # with a corrected Cache-Control).
-          sed -i "s/__BUILD_ID__/${GITHUB_SHA}/" /tmp/stage/index.html /tmp/stage/checkin/index.html
-          cd /tmp/stage && zip -r /tmp/deploy.zip .
+      - name: Package built site
+        run: cd dist && zip -r /tmp/deploy.zip .
 
       - name: Start Hostinger MCP server
         run: |
