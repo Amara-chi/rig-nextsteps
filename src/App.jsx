@@ -35,7 +35,7 @@ export default function App() {
   const { status, me, authLinkType, signIn, setPassword, signOut } = useAuth()
   const toastState = useToast()
   const { html: toastHtml, visible: toastVisible, toast } = toastState
-  const { people, openSession, todaysCheckins, refreshAll } = useAppData(me)
+  const { people, openSession, todaysCheckins, sessionFeed, refreshAll } = useAppData(me)
   const followUp = useFollowUp(me, people)
   const [fallbackUrl, setFallbackUrl] = useState(null)
 
@@ -64,7 +64,9 @@ export default function App() {
               {me.role !== 'director' && <ReadonlyBanner />}
 
               <Pane active={pane === 'today'}><Today people={people} openSession={openSession} todaysCheckins={todaysCheckins} /></Pane>
-              <Pane active={pane === 'session'}><SessionPane onNavigate={setActivePane} /></Pane>
+              <Pane active={pane === 'session'}>
+                <SessionPane onNavigate={setActivePane} openSession={openSession} sessionFeed={sessionFeed} onDataChange={refreshAll} />
+              </Pane>
               <Pane active={pane === 'videos'}><VideosPage onNavigate={setActivePane} onFallback={setFallbackUrl} /></Pane>
               <Pane active={pane === 'people'}><People people={people} onDataChange={refreshAll} /></Pane>
               <Pane active={pane === 'followup'}>

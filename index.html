@@ -12,6 +12,10 @@
 </head>
 <body>
 <div id="root"></div>
+<!-- qrcodejs is a legacy script that attaches window.QRCode as a global;
+     it doesn't export cleanly as an ES module, so it's loaded the same
+     way the old app did rather than bundled. -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script type="module" src="/src/main-admin.jsx"></script>
 </body>
 </html>

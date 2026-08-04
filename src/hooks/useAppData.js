@@ -10,11 +10,14 @@ import { todayStr } from '../lib/format.js'
 // early-exit as the old refreshAll()/refreshLive(). The "video restarts every
 // 10s" fix doesn't live here — it's a key prop on the session pane's video
 // subtree (keyed by openSession?.id), so a new openSession object every poll
-// doesn't remount it unless the id actually changes.
+// doesn't remount it unless the id actually changes. sessionFeed, unlike the
+// video, DOES need to refresh every poll regardless — matches the old
+// refreshLive()'s unconditional renderSessionFeed() call.
 export function useAppData(me) {
   const [people, setPeople] = useState([])
   const [openSession, setOpenSession] = useState(null)
   const [todaysCheckins, setTodaysCheckins] = useState([])
+  const [sessionFeed, setSessionFeed] = useState([])
 
   const loadPeople = useCallback(async () => {
     const { data, error } = await supabase.from('v_people_progress').select('*').order('last_seen', { ascending: false, nullsFirst: false })
@@ -37,17 +40,25 @@ export function useAppData(me) {
     setTodaysCheckins(data || [])
   }, [])
 
-  const refreshAll = useCallback(async () => {
+  const loadSessionFeed = useCallback(async (sessionId) => {
+    if (!sessionId) { setSessionFeed([]); return }
+    const { data } = await supabase
+      .from('checkins')
+      .select('step, created_at, people(full_name, created_at)')
+      .eq('session_id', sessionId)
+      .order('created_at', { ascending: false })
+    setSessionFeed(data || [])
+  }, [])
+
+  const loadAll = useCallback(async () => {
     if (!me || me.role === 'support') return
-    await Promise.all([loadPeople(), loadOpenSession(), loadTodaysCheckins()])
-  }, [me, loadPeople, loadOpenSession, loadTodaysCheckins])
+    const [, session] = await Promise.all([loadPeople(), loadOpenSession(), loadTodaysCheckins()])
+    await loadSessionFeed(session?.id)
+  }, [me, loadPeople, loadOpenSession, loadTodaysCheckins, loadSessionFeed])
 
-  useEffect(() => { refreshAll() }, [refreshAll])
+  useEffect(() => { loadAll() }, [loadAll])
 
-  usePolling(async () => {
-    if (!me || me.role === 'support') return
-    await Promise.all([loadPeople(), loadOpenSession(), loadTodaysCheckins()])
-  }, { enabled: !!me && me.role !== 'support' })
+  usePolling(loadAll, { enabled: !!me && me.role !== 'support' })
 
-  return { people, openSession, todaysCheckins, refreshAll }
+  return { people, openSession, todaysCheckins, sessionFeed, refreshAll: loadAll }
 }
