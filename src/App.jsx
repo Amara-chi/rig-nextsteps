@@ -6,7 +6,7 @@ import { useFollowUp } from './hooks/useFollowUp.js'
 import { useSupportPeople } from './hooks/useSupportPeople.js'
 import { MeProvider } from './context/MeContext.jsx'
 import { ToastProvider } from './context/ToastContext.jsx'
-import { NAV_FULL, NAV_SUPPORT, NAV_TEAM } from './nav.jsx'
+import { NAV_FULL, NAV_PROFILE, NAV_SUPPORT, NAV_TEAM } from './nav.jsx'
 import Login from './auth/Login.jsx'
 import SetPassword from './auth/SetPassword.jsx'
 import Sidebar from './components/Sidebar.jsx'
@@ -25,6 +25,7 @@ import SupportHouseChurch from './pages/SupportHouseChurch.jsx'
 import SupportFollowUp from './pages/SupportFollowUp.jsx'
 import SupportMembership from './pages/SupportMembership.jsx'
 import Team from './pages/Team.jsx'
+import Profile from './pages/Profile.jsx'
 
 // Base styles ported from the old global body{} rule (font, background, text
 // color/size, antialiasing) — applied here rather than as a shared body{}
@@ -33,7 +34,7 @@ import Team from './pages/Team.jsx'
 const BASE_CLASS = 'min-h-dvh font-sans bg-cream text-ink text-[15px] leading-[1.55] antialiased'
 
 export default function App() {
-  const { status, me, authLinkType, signIn, requestReset, setPassword, signOut } = useAuth()
+  const { status, me, authLinkType, signIn, requestReset, setPassword, signOut, refresh: refreshMe } = useAuth()
   const toastState = useToast()
   const { html: toastHtml, visible: toastVisible, toast } = toastState
   const { people, openSession, todaysCheckins, sessionFeed, refreshAll } = useAppData(me)
@@ -43,8 +44,8 @@ export default function App() {
 
   const nav = useMemo(() => {
     if (!me) return []
-    if (me.role === 'support') return NAV_SUPPORT
-    return me.role === 'director' ? [...NAV_FULL, NAV_TEAM] : NAV_FULL
+    if (me.role === 'support') return [...NAV_SUPPORT, NAV_PROFILE]
+    return me.role === 'director' ? [...NAV_FULL, NAV_TEAM, NAV_PROFILE] : [...NAV_FULL, NAV_PROFILE]
   }, [me])
 
   const [activePane, setActivePane] = useState(null)
@@ -85,6 +86,7 @@ export default function App() {
                 <SupportMembership list={support.membership} hadError={support.hadError} refresh={support.refresh} />
               </Pane>
               {me.role === 'director' && <Pane active={pane === 'team'}><Team /></Pane>}
+              <Pane active={pane === 'profile'}><Profile onDataChange={refreshMe} /></Pane>
             </main>
             <BottomNav nav={nav} activePane={pane} onNavigate={setActivePane} followupCount={followUp.attended.length} />
           </div>

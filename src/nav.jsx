@@ -7,6 +7,7 @@ const ICONS = {
   followup: <path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z" />,
   reports: <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8zM14 2v6h6M16 13H8M16 17H8" />,
   team: <><path d="M20 21v-2a4 4 0 00-3-3.87M14 3.13a4 4 0 010 7.75M4 21v-2a4 4 0 014-4h4a4 4 0 014 4v2" /><circle cx="10" cy="7" r="4" /></>,
+  profile: <><circle cx="12" cy="8" r="4" /><path d="M4 21v-1a6 6 0 016-6h4a6 6 0 016 6v1" /></>,
 }
 
 export const NAV_FULL = [
@@ -25,3 +26,4 @@ export const NAV_SUPPORT = [
 ]
 
 export const NAV_TEAM = { id: 'team', label: 'Team', icon: ICONS.team }
+export const NAV_PROFILE = { id: 'profile', label: 'Profile', icon: ICONS.profile }
