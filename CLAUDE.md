@@ -90,7 +90,7 @@ follow-ups, and generate reports.
 - `supabase/migrations/` — same content split for `supabase db push` workflows
 - `supabase/import-history.sql` — one-time historical data load (27 people, Mar–Jul 2026);
   idempotent; run AFTER the schema
-- `supabase/upgrade-v3.sql` through `upgrade-v11.sql` — only for databases created from older
+- `supabase/upgrade-v3.sql` through `upgrade-v12.sql` — only for databases created from older
   schema versions; NOT needed on fresh installs
 - `supabase/functions/email-report` — optional Edge Function: emails weekly report via Resend.
   Field selection and order matches `app_settings.report_fields` (see below) — same report,
@@ -265,16 +265,6 @@ Three staff roles, checked by `public.is_director()` / `is_leader()` / `is_suppo
 - People with zero check-ins on file get Step 1 backfilled, dated to their record's
   `created_at`, via `supabase/backfill-blank-step1.sql` (director's decision, 31 Jul 2026;
   idempotent, run once).
-
-## Known pre-existing bugs (found during the React migration, deliberately not fixed)
-The migration's brief was a faithful 1:1 port — same behaviour, bugs included — so these were
-found, confirmed to exist identically in the pre-migration app, and left alone pending an
-explicit decision:
-- **People search matches everything on a non-numeric query.** `(p.phone||"").includes(q.
-  replace(/\D/g,""))` — for a name-only search, `.replace(/\D/g,"")` strips it down to `""`,
-  and `"anything".includes("")` is always `true` in JS, so a non-matching name search silently
-  shows every row instead of filtering. Flagged to the user; awaiting a decision on whether to
-  fix it.
 
 ## Roadmap candidates (discussed, not committed)
 - Note tags (prayer / action / for HC leader) + filtered overseer view

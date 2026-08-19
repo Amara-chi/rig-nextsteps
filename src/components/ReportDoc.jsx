@@ -3,9 +3,11 @@ import { fmtDate, todayStr } from '../lib/format.js'
 
 const inputClass = 'w-full max-w-full box-border py-2.5 px-3 border-[1.5px] border-line rounded-[10px] bg-white text-[13.5px] font-sans text-ink-deep outline-none focus:border-orange focus:shadow-focus'
 
-export default function ReportDoc({ r, active, isDirector, editDate, setEditDate, editStep, setEditStep, editNotes, setEditNotes, onRemoveCustomField }) {
+export default function ReportDoc({ r, active, isDirector, editDate, setEditDate, editStep, setEditStep, editNotes, setEditNotes, editFacilitator, setEditFacilitator, onRemoveCustomField }) {
   const details = active.filter((f) => f.kind === 'detail')
+  const textFields = active.filter((f) => f.kind === 'text')
   const stats = active.filter((f) => f.kind === 'stat')
+  const nameFields = active.filter((f) => f.kind === 'names')
   const notesField = active.find((f) => f.kind === 'notes')
   const customFields = Array.isArray(r.custom_fields) ? r.custom_fields : []
 
@@ -45,12 +47,38 @@ export default function ReportDoc({ r, active, isDirector, editDate, setEditDate
         </div>
       )}
 
+      {textFields.length > 0 && (
+        <div className="pt-1.5 px-6">
+          {textFields.map((f) => (
+            <div key={f.key} className="py-2.5 border-b border-dashed border-line last:border-b-0">
+              <span className="font-mono text-[9.5px] tracking-[.08em] uppercase text-muted-label font-semibold block mb-1.75">{f.label}</span>
+              <div className="font-bold text-sm text-ink-deep">
+                {isDirector
+                  ? <input type="text" placeholder="Optional" value={editFacilitator} onChange={(e) => setEditFacilitator(e.target.value)} className={inputClass} />
+                  : (r.facilitator || '—')}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
       {stats.length > 0 && (
         <div className="grid grid-cols-2 gap-2.5 pt-4.5 px-6 pb-0.5">
           {stats.map((f) => (
             <div key={f.key} className="shadow-none border border-line py-3 px-3.5 rounded-[14px]">
               <div className="font-mono text-[9.5px] tracking-[.12em] uppercase text-muted-label font-semibold">{f.label}</div>
               <div className="text-[23px] font-black tracking-[-.03em] text-ink-deep mt-0.75 leading-none">{r[f.key]}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {nameFields.length > 0 && (
+        <div className="pt-1.5 px-6">
+          {nameFields.map((f) => (
+            <div key={f.key} className="py-2.5 border-b border-dashed border-line last:border-b-0">
+              <span className="font-mono text-[9.5px] tracking-[.08em] uppercase text-muted-label font-semibold block mb-1.75">{f.label}</span>
+              <div className="text-[13px] text-ink-deep leading-snug">{r[f.key] || '—'}</div>
             </div>
           ))}
         </div>

@@ -21,8 +21,11 @@ function waLineFor(f, r) {
   if (f.key === 'step') return `Step: Step ${r.step} — ${stepOf(r.step).title}`
   if (f.key === 'attendance') return `Attendance: ${r.attendance} people`
   if (f.key === 'first_timers') return `First-timers: ${r.first_timers}`
+  if (f.key === 'first_timer_names') return `First-timers (names): ${r.first_timer_names || '—'}`
   if (f.key === 'hc_interest') return `House church interest: ${r.hc_interest}`
+  if (f.key === 'hc_interest_names') return `House church interest (names): ${r.hc_interest_names || '—'}`
   if (f.key === 'serving_interest') return `Serving interest: ${r.serving_interest}`
+  if (f.key === 'serving_interest_names') return `Serving interest (names): ${r.serving_interest_names || '—'}`
   return ''
 }
 
@@ -60,11 +63,13 @@ export default function Reports({ people }) {
   const [editDate, setEditDate] = useState('')
   const [editStep, setEditStep] = useState(1)
   const [editNotes, setEditNotes] = useState('')
+  const [editFacilitator, setEditFacilitator] = useState('')
   useEffect(() => {
     if (!r) return
     setEditDate(r.session_date)
     setEditStep(r.step)
     setEditNotes(r.notes || '')
+    setEditFacilitator(r.facilitator || '')
   }, [r?.id])
 
   const [showCustomize, setShowCustomize] = useState(false)
@@ -81,15 +86,20 @@ export default function Reports({ people }) {
   const saveChanges = async () => {
     const upd = {}
     if (reportFieldKeys.includes('notes')) upd.notes = editNotes
+    if (reportFieldKeys.includes('facilitator')) upd.facilitator = editFacilitator.trim() || null
     if (isDirector && reportFieldKeys.includes('session_date')) upd.session_date = editDate
     if (isDirector && reportFieldKeys.includes('step')) upd.step = editStep
-    if (!Object.keys(upd).length) { toast('Nothing editable is shown — add Notes, Session date, or Step in Customize fields.'); return }
+    if (!Object.keys(upd).length) { toast('Nothing editable is shown — add Notes, Facilitator, Session date, or Step in Customize fields.'); return }
     const { error } = await updateSession(r.id, upd)
     toast(error ? "Couldn't save changes." : 'Changes saved.')
   }
 
   const sendWhatsApp = () => {
-    const lines = active.map((f, idx) => `${idx + 1}. ${f.key === 'notes' ? `Notes: ${editNotes || r.notes || '—'}` : waLineFor(f, r)}`)
+    const lines = active.map((f, idx) => {
+      if (f.key === 'notes') return `${idx + 1}. Notes: ${editNotes || r.notes || '—'}`
+      if (f.key === 'facilitator') return `${idx + 1}. Facilitator: ${editFacilitator || r.facilitator || '—'}`
+      return `${idx + 1}. ${waLineFor(f, r)}`
+    })
       .concat(customFields.map((cf, idx) => `${active.length + idx + 1}. ${cf.label}: ${cf.value}`))
       .join('\n')
     const text = `*Next Steps — Session Report*\nRig Church Lagos\n\n${lines}`
@@ -98,8 +108,14 @@ export default function Reports({ people }) {
   }
 
   const downloadSessionCSV = async () => {
-    const { data: cks } = await supabase.from('checkins').select('created_at, step, people(full_name, phone, email)').eq('session_id', r.id).order('created_at')
-    const rows = [['Name', 'Phone', 'Email', 'Step', 'Time']].concat((cks || []).map((c) => [c.people?.full_name, fmtPhone(c.people?.phone), c.people?.email || '', c.step, new Date(c.created_at).toLocaleString('en-GB')]))
+    // v_session_attendees matches by session date + step, not session_id — a
+    // checkin only gets session_id set if a session was already open at that
+    // moment, so filtering by session_id here undercounts the same way the
+    // old attendance stat used to (see v_session_report in schema.sql).
+    const { data: attendees } = await supabase.from('v_session_attendees').select('*')
+      .eq('session_date', r.session_date).eq('step', r.step).order('full_name')
+    const rows = [['Name', 'Phone', 'Email', 'Step', 'First-timer', 'HC interest', 'Serving interest', 'Time']]
+      .concat((attendees || []).map((a) => [a.full_name, fmtPhone(a.phone), a.email || '', r.step, a.is_first_timer_today ? 'Yes' : 'No', a.hc_interest ? 'Yes' : 'No', a.serving_interest ? 'Yes' : 'No', new Date(a.checkin_time).toLocaleString('en-GB')]))
     downloadCSV(`next-steps-${r.session_date}-step${r.step}.csv`, rows)
   }
 
@@ -152,6 +168,7 @@ export default function Reports({ people }) {
               editDate={editDate} setEditDate={setEditDate}
               editStep={editStep} setEditStep={setEditStep}
               editNotes={editNotes} setEditNotes={setEditNotes}
+              editFacilitator={editFacilitator} setEditFacilitator={setEditFacilitator}
               onRemoveCustomField={async (idx) => {
                 const { error } = await removeCustomField(r, idx)
                 if (error) toast("Couldn't remove — check your access.")

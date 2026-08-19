@@ -41,6 +41,15 @@ export function useAuth() {
     return {}
   }, [boot])
 
+  // Sends a recovery-link email; the link lands back here with
+  // type=recovery, which boot() above already routes to needsSetPassword.
+  const requestReset = useCallback(async (email) => {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin + window.location.pathname,
+    })
+    return { error }
+  }, [])
+
   const setPassword = useCallback(async (password) => {
     const { error } = await supabase.auth.updateUser({ password })
     if (error) return { error }
@@ -55,5 +64,5 @@ export function useAuth() {
     location.reload()
   }, [])
 
-  return { status, me, authLinkType, signIn, setPassword, signOut, refresh: boot }
+  return { status, me, authLinkType, signIn, requestReset, setPassword, signOut, refresh: boot }
 }

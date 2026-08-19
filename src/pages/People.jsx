@@ -172,7 +172,10 @@ export default function People({ people, onDataChange }) {
   const [search, setSearch] = useState('')
 
   const q = search.toLowerCase()
-  const rows = people.filter((p) => !q || p.full_name.toLowerCase().includes(q) || (p.phone || '').includes(q.replace(/\D/g, '')))
+  const qDigits = q.replace(/\D/g, '')
+  const qPhone = normPhoneJS(q)
+  const rows = people.filter((p) => !q || p.full_name.toLowerCase().includes(q) ||
+    (qDigits && ((p.phone || '').includes(qDigits) || (p.phone || '').includes(qPhone))))
 
   // ---- modal state ----
   const [editPerson, setEditPerson] = useState(null)

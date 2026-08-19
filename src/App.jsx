@@ -33,7 +33,7 @@ import Team from './pages/Team.jsx'
 const BASE_CLASS = 'min-h-dvh font-sans bg-cream text-ink text-[15px] leading-[1.55] antialiased'
 
 export default function App() {
-  const { status, me, authLinkType, signIn, setPassword, signOut } = useAuth()
+  const { status, me, authLinkType, signIn, requestReset, setPassword, signOut } = useAuth()
   const toastState = useToast()
   const { html: toastHtml, visible: toastVisible, toast } = toastState
   const { people, openSession, todaysCheckins, sessionFeed, refreshAll } = useAppData(me)
@@ -51,7 +51,7 @@ export default function App() {
   const pane = activePane ?? (me?.role === 'support' ? 'support-hc' : 'today')
 
   if (status === 'booting') return <div className={BASE_CLASS} />
-  if (status === 'loggedOut') return <div className={BASE_CLASS}><Login onSignIn={signIn} /></div>
+  if (status === 'loggedOut') return <div className={BASE_CLASS}><Login onSignIn={signIn} onRequestReset={requestReset} /></div>
   if (status === 'needsSetPassword') {
     return <div className={BASE_CLASS}><SetPassword authLinkType={authLinkType} onSetPassword={setPassword} /></div>
   }
