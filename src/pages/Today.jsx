@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { Bar, BarChart, Cell, LabelList, ResponsiveContainer, Tooltip, XAxis } from 'recharts'
 import PageHead from '../components/PageHead.jsx'
 import StatTile from '../components/StatTile.jsx'
 import Card, { CardHead } from '../components/Card.jsx'
@@ -6,11 +7,12 @@ import Badge from '../components/Badge.jsx'
 import Avatar from '../components/Avatar.jsx'
 import EmptyState from '../components/EmptyState.jsx'
 import LiveDot from '../components/LiveDot.jsx'
+import ChartTooltip from '../components/ChartTooltip.jsx'
 import { fmtTime, todayStr } from '../lib/format.js'
 import { stepOf } from '../config/site.js'
 
-const RAMP = [0.16, 0.36, 0.56, 0.78, 1]
 const PIPE_LABELS = ['New', '1 done', '2 done', '3 done', 'All 4']
+const PIPE_COLOR_VARS = ['--color-pipeline-1', '--color-pipeline-2', '--color-pipeline-3', '--color-pipeline-4', '--color-pipeline-5']
 
 export default function Today({ people, openSession, todaysCheckins }) {
   const greeting = useMemo(() => {
@@ -32,8 +34,19 @@ export default function Today({ people, openSession, todaysCheckins }) {
 
   const counts = [0, 0, 0, 0, 0]
   people.forEach((p) => { counts[Math.min(p.steps_done, 4)]++ })
-  const max = Math.max(...counts, 1)
   const completionPct = people.length ? Math.round((counts[4] / people.length) * 100) : 0
+
+  // Read the validated ordinal ramp from theme.css after mount (not at
+  // module scope) so the stylesheet is guaranteed applied first.
+  const pipeColors = useMemo(
+    () => PIPE_COLOR_VARS.map((v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim()),
+    [],
+  )
+  const pipeData = PIPE_LABELS.map((label, i) => ({
+    label,
+    count: counts[i],
+    pct: totalCount ? Math.round((counts[i] / totalCount) * 100) : 0,
+  }))
 
   return (
     <>
@@ -48,23 +61,35 @@ export default function Today({ people, openSession, todaysCheckins }) {
       <div className="grid grid-cols-2 gap-4.5 max-tablet:grid-cols-1">
         <Card className="mb-0">
           <CardHead title="The journey pipeline" sub="People by number of steps completed" />
-          <div className="grid grid-cols-5 gap-2 mt-6.5">
-            {PIPE_LABELS.map((label, i) => (
-              <div key={label} className="text-center">
-                <div className="h-24 flex items-end justify-center">
-                  <div
-                    className="w-[min(44px,80%)] rounded-arch relative min-h-2.5 transition-[height_.5s_cubic-bezier(.2,.8,.2,1)]"
-                    style={{
-                      height: `${Math.max(10, (counts[i] / max) * 100)}%`,
-                      background: i === 4 ? 'var(--color-orange)' : `color-mix(in srgb, var(--color-orange) ${RAMP[i] * 100}%, var(--color-cream-deep))`,
-                    }}
-                  >
-                    <div className="absolute -top-5.5 left-0 right-0 font-black text-sm text-ink-deep">{counts[i]}</div>
-                  </div>
-                </div>
-                <div className="font-mono text-[9px] tracking-[.06em] uppercase text-muted-label mt-1.75 font-semibold">{label}</div>
-              </div>
-            ))}
+          <div className="h-42 mt-6.5">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={pipeData} margin={{ top: 24, right: 4, left: 4, bottom: 0 }} barCategoryGap="18%">
+                <XAxis
+                  dataKey="label"
+                  tickLine={false}
+                  axisLine={false}
+                  tick={{ fontFamily: 'var(--font-mono)', fontSize: 9, letterSpacing: '.06em', fill: 'var(--color-muted-label)', fontWeight: 600 }}
+                  dy={6}
+                />
+                <Tooltip
+                  cursor={false}
+                  content={({ active, payload }) => (
+                    <ChartTooltip active={active} payload={payload} render={(d) => (
+                      <>
+                        <div className="font-mono text-[9px] tracking-[.06em] uppercase text-muted-label font-semibold">{d.label}</div>
+                        <div className="font-black text-ink-deep mt-0.5">{d.count} {d.count === 1 ? 'person' : 'people'} <span className="font-semibold text-muted-label">· {d.pct}%</span></div>
+                      </>
+                    )} />
+                  )}
+                />
+                <Bar dataKey="count" radius={[22, 22, 4, 4]} maxBarSize={44} minPointSize={4}>
+                  {pipeData.map((d, i) => (
+                    <Cell key={d.label} fill={pipeColors[i]} />
+                  ))}
+                  <LabelList dataKey="count" position="top" offset={8} style={{ fontWeight: 900, fontSize: 13, fill: 'var(--color-ink-deep)' }} />
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
           </div>
           <div className="flex items-start justify-between gap-3 flex-wrap mt-5.5">
             <div className="font-mono text-[9px] tracking-[.1em] uppercase text-muted-label font-semibold">Completed the whole journey</div>

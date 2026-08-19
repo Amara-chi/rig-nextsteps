@@ -37,13 +37,23 @@
   --color-amber-border: #EBD9B4;
   --color-welcome-border: #BFDCCB;
 
-  /* Journey pipeline bar chart's 5-step ramp — deterministic color-mix, so
-     this is a real token, not an approximation of one. */
-  --color-pipeline-1: color-mix(in srgb, var(--color-orange) 16%, var(--color-cream-deep));
-  --color-pipeline-2: color-mix(in srgb, var(--color-orange) 36%, var(--color-cream-deep));
-  --color-pipeline-3: color-mix(in srgb, var(--color-orange) 56%, var(--color-cream-deep));
-  --color-pipeline-4: color-mix(in srgb, var(--color-orange) 78%, var(--color-cream-deep));
-  --color-pipeline-5: var(--color-orange);
+  /* Journey pipeline chart's 5-step ordinal ramp. Same hue as brand orange
+     (H 35.4, single-hue check passes at 6° spread), lightness stepped in
+     OKLCH rather than a naive sRGB color-mix — the old color-mix ramp
+     looked plausible but failed validation: adjacent steps sat under 0.06
+     apart in OKLCH L (unreadable as a progression) and the lightest step
+     cleared only 1.31:1 contrast against the cream surface (near-invisible).
+     This ramp passes all four ordinal checks (monotone L, >=0.06 adjacent
+     gaps, light-end contrast >=2:1 at 2.04:1, single hue) against
+     --color-cream — see the dataviz skill's validate_palette.js --ordinal.
+     Deliberately extends darker than --color-orange-deep at the "All 4"
+     end; the existing brand orange pair alone doesn't span enough OKLCH
+     lightness range for a 5-step readable ramp on this surface. */
+  --color-pipeline-1: #db9582;
+  --color-pipeline-2: #d07962;
+  --color-pipeline-3: #c35b40;
+  --color-pipeline-4: #b53a19;
+  --color-pipeline-5: #a50d00;
 
   /* The "arch" motif from the logo — border-radius accepts this as a valid
      four-value shorthand, so rounded-arch is a single real utility. */

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { Bar, BarChart, LabelList, ResponsiveContainer, Tooltip, XAxis } from 'recharts'
 import PageHead from '../components/PageHead.jsx'
 import Card, { CardHead } from '../components/Card.jsx'
 import BtnSm from '../components/BtnSm.jsx'
@@ -6,6 +7,7 @@ import Field, { TextInput } from '../components/Field.jsx'
 import Modal from '../components/Modal.jsx'
 import ReportDoc from '../components/ReportDoc.jsx'
 import EmptyState from '../components/EmptyState.jsx'
+import ChartTooltip from '../components/ChartTooltip.jsx'
 import { useMe } from '../context/MeContext.jsx'
 import { useAppToast } from '../context/ToastContext.jsx'
 import { useReports } from '../hooks/useReports.js'
@@ -128,10 +130,13 @@ export default function Reports({ people }) {
     () => reportRows.filter((row) => (!from || row.session_date >= from) && (!to || row.session_date <= to)).sort((a, b) => (a.session_date < b.session_date ? -1 : 1)),
     [reportRows, from, to],
   )
-  const maxAttendance = Math.max(...rangeRows.map((row) => row.attendance), 1)
   const totalAttendance = rangeRows.reduce((a, row) => a + Number(row.attendance), 0)
   const avgAttendance = rangeRows.length ? Math.round(totalAttendance / rangeRows.length) : 0
   const firstTimersTotal = rangeRows.reduce((a, row) => a + Number(row.first_timers), 0)
+  const chartData = rangeRows.map((row) => ({ ...row, label: `${fmtDate(row.session_date).slice(0, 6)} · S${row.step}` }))
+  // Past ~20 bars, per-bar value labels stop being readable — the tooltip
+  // and axis still carry every value, so nothing is hidden, just decluttered.
+  const showBarLabels = chartData.length <= 20
   const completions = people.filter((p) => p.steps_done === 4 && p.completed_on && (!from || p.completed_on >= from) && (!to || p.completed_on <= to)).length
   const placed = people.filter((p) => p.hc_interest).length
 
@@ -176,14 +181,20 @@ export default function Reports({ people }) {
             />
           )}
           {r && (
-            <div className="flex gap-2 mt-3.5 flex-wrap">
-              <BtnSm onClick={() => window.print()}>Download PDF</BtnSm>
-              <BtnSm variant="outline" onClick={sendWhatsApp}>Send to leader (WhatsApp)</BtnSm>
-              <BtnSm variant="outline" onClick={downloadSessionCSV}>Download attendance CSV</BtnSm>
-              {isDirector && <BtnSm variant="outline" onClick={saveChanges}>Save changes</BtnSm>}
-              {isDirector && <BtnSm variant="outline" onClick={() => setShowCustomize(true)}>Customize fields</BtnSm>}
-              {isDirector && <BtnSm variant="outline" onClick={() => setShowAddField(true)}>Add a field</BtnSm>}
-              {isDirector && <BtnSm variant="outline" className="text-orange-deep!" onClick={() => setShowDelete(true)}>Delete session</BtnSm>}
+            <div className="mt-3.5 flex flex-col gap-2.5">
+              <div className="flex gap-2 flex-wrap">
+                <BtnSm onClick={() => window.print()}>Download PDF</BtnSm>
+                <BtnSm variant="outline" onClick={sendWhatsApp}>Send to leader (WhatsApp)</BtnSm>
+                <BtnSm variant="outline" onClick={downloadSessionCSV}>Download attendance CSV</BtnSm>
+              </div>
+              {isDirector && (
+                <div className="flex gap-2 flex-wrap pt-2.5 border-t border-dashed border-line">
+                  <BtnSm variant="outline" onClick={saveChanges}>Save changes</BtnSm>
+                  <BtnSm variant="outline" onClick={() => setShowCustomize(true)}>Customize fields</BtnSm>
+                  <BtnSm variant="outline" onClick={() => setShowAddField(true)}>Add a field</BtnSm>
+                  <BtnSm variant="outline" className="text-orange-deep! ml-auto" onClick={() => setShowDelete(true)}>Delete session</BtnSm>
+                </div>
+              )}
             </div>
           )}
         </Card>
@@ -206,18 +217,40 @@ export default function Reports({ people }) {
               </>
             )}
           </div>
-          <div className="grid gap-2 [grid-template-columns:repeat(auto-fit,minmax(52px,1fr))] mt-6.5">
-            {rangeRows.length ? rangeRows.map((row) => (
-              <div key={row.id} className="text-center">
-                <div className="h-24 flex items-end justify-center">
-                  <div className="w-[min(44px,80%)] bg-orange rounded-arch relative min-h-2.5 transition-[height_.5s_cubic-bezier(.2,.8,.2,1)]" style={{ height: `${Math.max(10, (row.attendance / maxAttendance) * 100)}%` }}>
-                    <div className="absolute -top-5.5 left-0 right-0 font-black text-sm text-ink-deep">{row.attendance}</div>
-                  </div>
-                </div>
-                <div className="font-mono text-[9px] tracking-[.06em] uppercase text-muted-label mt-1.75 font-semibold">{fmtDate(row.session_date).slice(0, 6)} · S{row.step}</div>
+          {chartData.length ? (
+            <div className="overflow-x-auto mt-6.5">
+              <div className="h-46" style={{ width: `max(100%, ${chartData.length * 56}px)` }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={chartData} margin={{ top: 24, right: 4, left: 4, bottom: 0 }} barCategoryGap="28%">
+                    <XAxis
+                      dataKey="label"
+                      tickLine={false}
+                      axisLine={false}
+                      tick={{ fontFamily: 'var(--font-mono)', fontSize: 9, letterSpacing: '.06em', fill: 'var(--color-muted-label)', fontWeight: 600 }}
+                      dy={6}
+                      interval={0}
+                    />
+                    <Tooltip
+                      cursor={{ fill: 'var(--color-cream-deep)', opacity: 0.5 }}
+                      content={({ active, payload }) => (
+                        <ChartTooltip active={active} payload={payload} render={(row) => (
+                          <>
+                            <div className="font-mono text-[9px] tracking-[.06em] uppercase text-muted-label font-semibold">{fmtDate(row.session_date)} · Step {row.step}</div>
+                            <div className="font-black text-ink-deep mt-0.5">{row.attendance} attended <span className="font-semibold text-muted-label">· {row.first_timers} first-time{row.first_timers === 1 ? 'r' : 'rs'}</span></div>
+                          </>
+                        )} />
+                      )}
+                    />
+                    <Bar dataKey="attendance" fill="var(--color-orange)" radius={[22, 22, 4, 4]} maxBarSize={44} minPointSize={4}>
+                      {showBarLabels && (
+                        <LabelList dataKey="attendance" position="top" offset={8} style={{ fontWeight: 900, fontSize: 13, fill: 'var(--color-ink-deep)' }} />
+                      )}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
               </div>
-            )) : <div className="col-span-full"><EmptyState>No sessions in this range.</EmptyState></div>}
-          </div>
+            </div>
+          ) : <div className="mt-6.5"><EmptyState>No sessions in this range.</EmptyState></div>}
           <div className="mt-4.5">
             {[
               ['Sessions run', rangeRows.length],
