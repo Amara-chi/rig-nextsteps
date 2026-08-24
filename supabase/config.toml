@@ -243,9 +243,18 @@ otp_expiry = 3600
 # admin_email = "admin@email.com"
 # sender_name = "Admin"
 
-# Uncomment to customize email template
+# Branded auth emails, styled to match the app's sign in screens (see
+# supabase/templates/). This wiring only covers the LOCAL stack. A hosted
+# project reads its own copies from Dashboard > Authentication > Emails, so
+# paste the same file there whenever one of these changes.
+[auth.email.template.recovery]
+subject = "Reset your Next Steps password"
+content_path = "./supabase/templates/reset-password.html"
+
+# The invite email, same shell as the reset one above. Uncomment once the
+# dashboard's invite template is this file, so local and production match.
 # [auth.email.template.invite]
-# subject = "You have been invited"
+# subject = "You're invited to the Next Steps team app"
 # content_path = "./supabase/templates/invite.html"
 
 # Uncomment to customize notification email template

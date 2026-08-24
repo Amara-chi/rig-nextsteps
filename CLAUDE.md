@@ -92,6 +92,14 @@ follow-ups, and generate reports.
   idempotent; run AFTER the schema
 - `supabase/upgrade-v3.sql` through `upgrade-v12.sql` — only for databases created from older
   schema versions; NOT needed on fresh installs
+- `supabase/templates/` — the branded auth emails GoTrue sends: `reset-password.html`
+  (forgot-password link) and `invite.html` (new staff member's first sign in). Same shell as
+  each other and as the report email's cream logo banner, so all three read as one system:
+  table-based layout, inline styles only, `Arial` (webfonts don't survive most mail clients),
+  brand hexes hardcoded because an email can't reach `theme.css`. `config.toml`'s
+  `[auth.email.template.*]` wiring only affects the LOCAL stack, so a hosted project needs the
+  same HTML pasted into Dashboard → Authentication → Emails (or pushed with
+  `supabase config push`); keep the two in step whenever a template changes.
 - `supabase/functions/email-report` — optional Edge Function: emails weekly report via Resend.
   Field selection and order matches `app_settings.report_fields` (see below) — same report,
   same customization, whether viewed on screen or emailed.
