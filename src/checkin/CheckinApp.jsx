@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { supabase } from '../lib/supabaseClient.js'
-import { STEPS } from '../config/site.js'
+import { STEPS, HEARD_OPTIONS } from '../config/site.js'
 
 const QUEUE_KEY = 'rig_pending_checkins'
-const HEARD_OPTIONS = ['A friend or family member', 'Instagram', 'WhatsApp', 'Walked past / neighbourhood', 'Google search', 'Other']
 
 // Custom dropdown arrow — kept as an inline style (not a Tailwind class)
 // since the data: URI's quotes/percent-escapes don't survive being embedded

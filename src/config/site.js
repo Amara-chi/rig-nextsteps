@@ -10,6 +10,14 @@ export const CHECKIN_URL = 'https://nextsteps.rigchurchlagos.org/checkin'
 
 export const CHURCH_NAME = 'Rig Church Lagos'
 
+// The "How did you hear about us?" answers. Shared by the visitor check-in
+// form (where a first-timer picks one) and People's Edit details modal
+// (where a director corrects it), so the two can never drift apart.
+// Imported history predates this list, so some people hold a value that
+// isn't in it — the edit modal keeps such a value as an extra option rather
+// than silently overwriting it.
+export const HEARD_OPTIONS = ['A friend or family member', 'Instagram', 'WhatsApp', 'Walked past / neighbourhood', 'Google search', 'Other']
+
 // Your leader's WhatsApp number for the one-tap weekly report
 // (e.g. "0803 000 0000"). Leave "" to pick the contact each time.
 export const LEADER_WHATSAPP = ''
