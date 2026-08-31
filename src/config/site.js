@@ -28,12 +28,18 @@ export const LEADER_WHATSAPP = ''
 export const EMAIL_REPORTS = false
 
 // The four steps (from the Next Steps Director SOP). Paste each step's
-// video into "url" — YouTube (unlisted is fine), Vimeo, or a direct video
-// file path (e.g. "/videos/session-1.mp4") if the file is hosted on this
-// server instead. It will play inside Session Mode on the TV. Optional
+// video into "url" — a Google Drive share link (paste it exactly as Drive
+// gives it: the /file/d/<id>/view, /open?id= and /uc?id= shapes all work,
+// the player converts it to Drive's own /preview embed itself), YouTube
+// (unlisted is fine), Vimeo, or a direct video file path
+// (e.g. "/videos/session-1.mp4") if the file is hosted on this server
+// instead. A Drive video MUST be shared as "Anyone with the link, Viewer",
+// or staff get a Google sign-in wall where the player should be. Whichever
+// source is used, it plays inside Session Mode on the TV. Optional
 // "fallbackUrl": a second source shown as a button under the player
-// ("Stream from YouTube instead" / "Play local copy instead", whichever
-// fits), in case the primary source buffers or won't play.
+// ("Play local copy instead" / "Stream from Google Drive instead", named
+// after whatever the fallback actually is), in case the primary source
+// buffers or won't play.
 export const STEPS = [
   { n: 1, title: 'Why God Put You on the Earth', video: 'Session 1 — Encounter & Identity', url: 'https://youtu.be/A6-clb0SnvA', fallbackUrl: '/videos/session-1.mp4' },
   { n: 2, title: "The House You're Walking Into", video: 'Session 2 — Vision, Mission & Values', url: 'https://youtu.be/ak45wQUWpTo', fallbackUrl: '/videos/session-2.mp4' },

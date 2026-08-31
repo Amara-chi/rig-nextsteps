@@ -3,7 +3,7 @@ import PageHead, { Breadcrumb, CrumbLink } from '../components/PageHead.jsx'
 import Card, { CardHead } from '../components/Card.jsx'
 import BtnSm from '../components/BtnSm.jsx'
 import { STEPS } from '../config/site.js'
-import { isDirectVideo, toEmbed } from '../lib/video.js'
+import { isDirectVideo, toEmbed, videoSourceName } from '../lib/video.js'
 
 function StepPlayer({ step, onFallback }) {
   const videoRef = useRef(null)
@@ -11,7 +11,7 @@ function StepPlayer({ step, onFallback }) {
   if (!step.url) {
     return (
       <div className="py-3 px-3.5 rounded-xl bg-cream border-[1.5px] border-dashed border-line text-xs text-muted-sub mb-4">
-        No video linked for this step yet. Add a YouTube/Vimeo link, or a direct video file path (e.g. /videos/session-1.mp4), for Step {step.n} in <b>config.js</b> and it will play right here.
+        No video linked for this step yet. Add a Google Drive share link, a YouTube/Vimeo link, or a direct video file path (e.g. /videos/session-1.mp4), for Step {step.n} in <b>src/config/site.js</b> and it will play right here.
       </div>
     )
   }
@@ -54,7 +54,7 @@ function StepPlayer({ step, onFallback }) {
       </div>
       {step.fallbackUrl && (
         <BtnSm variant="outline" onClick={() => onFallback(step.fallbackUrl)}>
-          {isDirectVideo(step.fallbackUrl) ? 'Play local copy instead' : 'Stream from YouTube instead'}
+          {isDirectVideo(step.fallbackUrl) ? 'Play local copy instead' : `Stream from ${videoSourceName(step.fallbackUrl)} instead`}
         </BtnSm>
       )}
     </>
