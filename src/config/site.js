@@ -42,9 +42,9 @@ export const EMAIL_REPORTS = false
 // buffers or won't play.
 export const STEPS = [
   { n: 1, title: 'Why God Put You on the Earth', video: 'Session 1 — Encounter & Identity', url: 'https://drive.google.com/file/d/19dSevBTHO7-Qq5CogEv9H2bWHlszVi4O/view?usp=sharing', fallbackUrl: 'https://youtu.be/A6-clb0SnvA' },
-  { n: 2, title: "The House You're Walking Into", video: 'Session 2 — Vision, Mission & Values', url: 'https://youtu.be/ak45wQUWpTo', fallbackUrl: '/videos/session-2.mp4' },
-  { n: 3, title: 'Find Your Place', video: 'Session 3 — Gifts, Serving & Community', url: 'https://youtu.be/ZVNXobWbjL0', fallbackUrl: '/videos/session-3.mp4' },
-  { n: 4, title: 'All In', video: 'Session 4 — Covenant, Commitment & Commissioning', url: 'https://youtu.be/I4sA1zJiIPc' },
+  { n: 2, title: "The House You're Walking Into", video: 'Session 2 — Vision, Mission & Values', url: 'https://drive.google.com/file/d/1H2evqrfdkwOxVWIyPRDqPP2EKKMMmJ7-/view?usp=drive_link', fallbackUrl: 'https://youtu.be/ak45wQUWpTo' },
+  { n: 3, title: 'Find Your Place', video: 'Session 3 — Gifts, Serving & Community', url: 'https://drive.google.com/file/d/1-9fwbEUj7J_TMmWbo_vdy6SaL5GnYeGz/view?usp=drive_link', fallbackUrl: 'https://youtu.be/ZVNXobWbjL0' },
+  { n: 4, title: 'All In', video: 'Session 4 — Covenant, Commitment & Commissioning', url: 'https://drive.google.com/file/d/19cUsWx81Kd6TcFMypOnutJVz7SK5jb6Y/view?usp=drive_link', fallbackUrl: 'https://youtu.be/I4sA1zJiIPc' },
 ]
 
 export const stepOf = (n) => STEPS[n - 1] || { title: '?', video: '' }
