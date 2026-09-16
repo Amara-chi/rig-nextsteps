@@ -8,7 +8,10 @@
 // Requirements (see PHASE2-GUIDE.md):
 //   - Meta developer account with WhatsApp Cloud API enabled
 //   - An APPROVED message template named "next_steps_followup"
-//     with two variables: {{1}} = first name, {{2}} = step number
+//     with ONE variable: {{1}} = first name. Its body must stay word for word
+//     identical to MSG_ATTENDED in src/config/site.js, so the one-tap send and
+//     this scheduled send read as the same church. Sending a different number
+//     of parameters than the approved template declares fails the whole send.
 //     (business-initiated WhatsApp messages must use templates)
 // Secrets to set in Supabase > Edge Functions > Secrets:
 //   WHATSAPP_TOKEN     - permanent system-user access token
@@ -27,7 +30,7 @@ Deno.serve(async (_req) => {
   const since = new Date(Date.now() - 48 * 3600 * 1000).toISOString();
   const { data: pending, error } = await admin
     .from("followups")
-    .select("id, people(full_name, phone), checkins(step)")
+    .select("id, people(full_name, phone)")
     .eq("type", "attended").eq("status", "pending")
     .gte("created_at", since)
     .limit(100);
@@ -40,7 +43,6 @@ Deno.serve(async (_req) => {
 
   for (const f of pending ?? []) {
     const first = (f.people?.full_name ?? "").split(" ")[0];
-    const step = String(f.checkins?.step ?? "");
     try {
       const res = await fetch(`https://graph.facebook.com/v21.0/${phoneId}/messages`, {
         method: "POST",
@@ -56,7 +58,6 @@ Deno.serve(async (_req) => {
               type: "body",
               parameters: [
                 { type: "text", text: first },
-                { type: "text", text: step },
               ],
             }],
           },

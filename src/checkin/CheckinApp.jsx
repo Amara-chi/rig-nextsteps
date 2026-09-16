@@ -183,6 +183,11 @@ export default function CheckinApp() {
                 className={fieldClass}
               />
               {phoneErr && <div className="mt-2 text-[12.5px] font-semibold text-orange-deep">Please enter a valid phone number.</div>}
+              {/* Meta classifies our follow-up template as Marketing, which expects
+                  people to have been told they'll be messaged. Keep this visible. */}
+              <p className="mt-2.5 text-[12px] leading-[1.45] text-checkin-lead">
+                We'll send you a WhatsApp message after Next Steps to say hello. Nothing else, and you can tell us to stop any time.
+              </p>
             </div>
             <button type="button" disabled={continuing} onClick={handlePhoneContinue} className={`${primaryBtnClass} mt-4.5`}>
               {continuing ? 'One moment…' : 'Continue'}

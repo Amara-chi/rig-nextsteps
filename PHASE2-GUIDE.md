@@ -61,9 +61,11 @@ From then on, ending a session emails the report automatically. If the email eve
 This is the "messages send themselves" upgrade. It uses Meta's **official WhatsApp Business (Cloud) API** — the compliant route; unofficial auto-senders risk the church's number being banned. It's more setup than Add-on A, so many churches happily stay with the one-tap flow. Honest picture of what's involved:
 
 1. **Meta setup:** create a Meta developer account (developers.facebook.com), create an app, add the **WhatsApp** product, and connect a phone number for the church (this number becomes API-only — use a dedicated number, not the director's personal one). Generate a **permanent access token** via a system user, and note the **Phone Number ID**.
-2. **Template approval:** business-initiated WhatsApp messages must use pre-approved templates. In WhatsApp Manager, create a template named `next_steps_followup`, language English, body:
-   > *Hi {{1}}, it was great meeting you today at Step {{2}}. Really glad you came. Looking forward to seeing you next Sunday!*
+2. **Template approval:** business-initiated WhatsApp messages must use pre-approved templates. In WhatsApp Manager, create a template named `next_steps_followup`, language **English** (plain `en`, not English (US) — the function sends `en` and a mismatch fails with error 132001), category **Marketing**, body (must match `MSG_ATTENDED` in `src/config/site.js` word for word):
+   > *Hi {{1}}, this is Rig Church Lagos. We are glad you joined us at Next Steps today. We really hope you enjoyed your time with us, and we would love to see you again soon. Have a wonderful week!*
    
+   Meta's classifier rejects this copy as Utility: Utility means transactional, about an existing order or account, and a warm "glad you joined us" note is not that. Marketing is the honest category. It costs more per message and expects people to have been told they'll be messaged, which is why the check-in form now says so above the phone field. Keep that line if the copy stays Marketing.
+
    Approval usually takes minutes to a day.
 3. **Deploy the function:**
    ```
@@ -74,7 +76,7 @@ This is the "messages send themselves" upgrade. It uses Meta's **official WhatsA
 
 The function only auto-sends follow-ups created in the last 48 hours; anything it can't deliver stays visible in the app's Follow-Up queue for the human touch. Meta's free tier comfortably covers this volume (service conversations at this scale are effectively free; check current Meta pricing).
 
-**Costs:** Resend free tier — ₦0. WhatsApp Cloud API at your volume — effectively ₦0 to a few hundred naira monthly. Supabase — still free tier.
+**Costs:** Resend free tier — ₦0. Supabase — still free tier. WhatsApp Cloud API is billed per message in USD, by category and country: check Meta's current **Marketing** rate for **Nigeria** and multiply by roughly 87 (20 a week). Small at this volume, but not the near-zero a Utility template would have cost, and it's a recurring charge on a card, so it needs the director's sign-off.
 
 ---
 
