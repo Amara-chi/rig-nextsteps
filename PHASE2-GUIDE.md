@@ -80,6 +80,51 @@ The function only auto-sends follow-ups created in the last 48 hours; anything i
 
 ---
 
+## Add-on C — WhatsApp conversations inside the app (~1 hr, one-time)
+
+Everything the church sends a newcomer now goes **from the church's own WhatsApp number**, and
+their replies come back into the app, so nobody has to use a personal phone. Needs Add-on B's
+Meta setup done first.
+
+1. **Run the SQL.** Paste `supabase/upgrade-v13.sql` into Supabase → SQL Editor → Run. It adds
+   `whatsapp_messages` and `wa_window_open()`.
+2. **Deploy both functions:**
+   ```
+   supabase functions deploy whatsapp-webhook --no-verify-jwt
+   supabase functions deploy whatsapp-send
+   ```
+   The webhook takes no JWT because Meta calls it with no session; it authenticates by checking
+   Meta's signature instead. `whatsapp-send` keeps JWT verification precisely because it is
+   called from the browser.
+3. **Two more secrets** (Supabase → Edge Functions → Secrets):
+   - `WHATSAPP_VERIFY_TOKEN` — any random string you invent; you type the same one into Meta.
+   - `WHATSAPP_APP_SECRET` — Meta → App settings → Basic → App secret.
+4. **Register the webhook.** Meta app → WhatsApp → Configuration:
+   - Callback URL: `https://<project-ref>.supabase.co/functions/v1/whatsapp-webhook`
+   - Verify token: the string from step 3
+   - Click **Verify and save**, then **Manage** and subscribe to the **messages** field. Without
+     that subscription Meta accepts the URL and then never sends anything to it.
+5. **Flip the app to Live** (toggle at the top of the Meta app dashboard). Production webhooks
+   are not delivered while the app is in Development mode.
+
+**The 24-hour rule, which shapes the whole feature:** WhatsApp only allows free-form messages
+within 24 hours of the person's last inbound message. Outside that window, only approved
+templates. So the chat's compose box is live once someone has replied, and until then the only
+thing staff can send is the approved template. This is enforced in `whatsapp-send`, not just in
+the UI.
+
+**Only the attended message has an approved template.** The completion and no-show messages say
+different things, and Meta approves each wording separately. Get each one approved in WhatsApp
+Manager and set `WHATSAPP_TEMPLATE_COMPLETED` / `WHATSAPP_TEMPLATE_NOSHOW`. Until then those
+buttons refuse with an on-screen explanation rather than sending the wrong words.
+
+**What this changes for leadership accounts:** they used to be able to send a follow-up from
+their own phone. Sending now happens from the church number through the database's rules, and
+leaders are read-only, so they can read a conversation but not reply. Directors send; support
+accounts send to the people they can already see.
+
+---
+
 ## A note on the SOP boundaries (unchanged)
 
 Even with Phase 2's new powers, the guardrails hold: leadership accounts still cannot edit anything (the database enforces it), house church *placement* still lives with the overseer, and "Welcome as member" only records what leadership has already decided — the button literally says so on screen.

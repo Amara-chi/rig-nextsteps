@@ -6,10 +6,12 @@ import BtnSm from './BtnSm.jsx'
 import NotesThread from './NotesThread.jsx'
 import EmptyState from './EmptyState.jsx'
 import OutcomeModal from './OutcomeModal.jsx'
+import ChatPanel from './ChatPanel.jsx'
 import { useMe } from '../context/MeContext.jsx'
 import { useAppToast } from '../context/ToastContext.jsx'
 import { supabase } from '../lib/supabaseClient.js'
-import { fillMsg, fmtPhone, waLink } from '../lib/format.js'
+import { fillMsg, fmtPhone } from '../lib/format.js'
+import { sendWhatsApp } from '../lib/whatsapp.js'
 import { MSG_ATTENDED, MSG_COMPLETED } from '../config/site.js'
 
 const linkBtnClass = 'inline-flex items-center gap-1.5 px-4 py-2.25 rounded-[10px] font-bold text-[12.5px] whitespace-nowrap bg-white border-[1.5px] border-line text-ink hover:border-orange hover:text-orange'
@@ -42,19 +44,33 @@ export default function SupportPersonList({ list, context, hadError, refresh }) 
   const me = useMe()
   const toast = useAppToast()
   const [outcomeState, setOutcomeState] = useState(null)
+  const [chatPerson, setChatPerson] = useState(null)
+  const [sendingId, setSendingId] = useState(null)
 
   const saveOutcomeNote = async (personId, status, text) => {
     if (!text) return
     await supabase.from('person_notes').insert({ person_id: personId, author_id: me.id, note: `Follow-up — ${STATUS_LABEL[status] || status}: ${text}` })
   }
 
+  // Sends from the church's WhatsApp number via the Cloud API, the same path
+  // the Follow-Up Centre uses. whatsapp-send checks support_visible_person()
+  // for support accounts, so this can only reach the people this page already
+  // shows — the authorisation is not the button being hidden.
   const sendFirstMessage = async (p) => {
     const completed = p.steps_done === 4
     const first = p.full_name.split(' ')[0]
     const msg = completed ? fillMsg(MSG_COMPLETED, first, p.open_followup_step) : fillMsg(MSG_ATTENDED, first, p.open_followup_step || '')
-    window.open(waLink(p.phone, msg), '_blank', 'noopener')
+    setSendingId(p.id)
+    const res = await sendWhatsApp({
+      person_id: p.id,
+      mode: 'template',
+      template_key: completed ? 'completed' : 'attended',
+      display_text: msg,
+    })
+    setSendingId(null)
+    if (!res.ok) { toast(res.error); return }
     const { error } = await supabase.from('followups').update({ status: 'sent', updated_at: new Date().toISOString() }).eq('id', p.open_followup_id)
-    if (error) { toast("WhatsApp opened, but couldn't log it — check your access."); return }
+    if (error) { toast("Message sent, but couldn't log it. Check your access."); return }
     toast('Sent — log the outcome once you hear back.')
     setTimeout(refresh, 1000)
   }
@@ -93,7 +109,11 @@ export default function SupportPersonList({ list, context, hadError, refresh }) 
                   <div className="text-xs text-muted-label mt-0.5">{fmtPhone(p.phone)}{p.email ? ' · ' + p.email : ''}</div>
                 </div>
                 <div className="ml-auto flex gap-1.75 flex-none flex-wrap">
-                  {kind === 'send-first' && <BtnSm onClick={() => sendFirstMessage(p)}>Send on WhatsApp</BtnSm>}
+                  {kind === 'send-first' && (
+                    <BtnSm disabled={sendingId === p.id} onClick={() => sendFirstMessage(p)}>
+                      {sendingId === p.id ? 'Sending…' : 'Send on WhatsApp'}
+                    </BtnSm>
+                  )}
                   {kind === 'log-followup' && (
                     <>
                       <a href={waLink(p.phone, '')} target="_blank" rel="noopener" className={linkBtnClass}>Open chat</a>
@@ -109,7 +129,7 @@ export default function SupportPersonList({ list, context, hadError, refresh }) 
                   {kind === 'plain' && (
                     <>
                       <a href={`tel:+${p.phone}`} className={linkBtnClass}>Call</a>
-                      <a href={waLink(p.phone, '')} target="_blank" rel="noopener" className={linkBtnClass}>WhatsApp</a>
+                      <button type="button" onClick={() => setChatPerson(p)} className={linkBtnClass}>WhatsApp</button>
                     </>
                   )}
                 </div>
@@ -119,6 +139,10 @@ export default function SupportPersonList({ list, context, hadError, refresh }) 
           )
         }) : <EmptyState>No one here right now. 🎉</EmptyState>}
       </Card>
+      {chatPerson && (
+        <ChatPanel person={chatPerson} completed={chatPerson.steps_done === 4} onClose={() => setChatPerson(null)} onSent={refresh} />
+      )}
+
       <OutcomeModal
         open={!!outcomeState}
         title={outcomeState?.title}

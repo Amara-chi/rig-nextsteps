@@ -59,14 +59,20 @@ follow-ups, and generate reports.
   pattern), `Card`/`CardHead`, `Badge`, `Avatar`, `BtnSm`/`Btn`, `NotesThread` (shared by
   People's person-detail view and the Support pages — `showLabel`/`className` props cover the
   two contexts' small markup differences), `OutcomeModal` (shared by Follow-Up Centre and
-  Support's Follow Up page), `Sidebar`/`BottomNav`/`Pane`, `Toast`, `VideoFallbackModal`.
+  Support's Follow Up page), `ChatPanel` (the in-app WhatsApp conversation, shared by
+  Follow-Up's "Open chat" and the Support pages' "WhatsApp" button; the caller passes
+  `completed` because a Follow-Up person row and a Support one don't carry the same fields),
+  `Sidebar`/`BottomNav`/`Pane`, `Toast`, `VideoFallbackModal`.
 - `src/hooks/` — `useAuth`, `useAppData` (people/session/checkins/session-feed, polled every
   10s for non-support roles), `useFollowUp`, `useSupportPeople` (the support role's own
   `v_support_people`-backed data, also polled), `useReports`, `usePolling` (generic
   `setInterval` + `document.hidden` guard), `useToast`.
 - `src/lib/` — `supabaseClient.js` (reads the `VITE_*` env vars), `phone.js` (`normPhoneJS`,
   kept in sync with the SQL `norm_phone()` function), `format.js`, `video.js`
-  (`toEmbed`/`isDirectVideo` for the Videos pane's YouTube/Vimeo/direct-file players), `csv.js`.
+  (`toEmbed`/`isDirectVideo` for the Videos pane's YouTube/Vimeo/direct-file players), `csv.js`,
+  `whatsapp.js` (`sendWhatsApp`, the one door to the `whatsapp-send` function — it exists
+  mainly because `functions.invoke()` reports every non-2xx as a generic FunctionsHttpError,
+  and the message worth showing a human is in the response body, off `error.context`).
 - `src/config/site.js` — the non-secret settings that used to live in `RIG_CONFIG`
   (`CHECKIN_URL`, `CHURCH_NAME`, `STEPS`, message templates, `EMAIL_REPORTS` flag).
 - `src/config/reportFields.js`, `src/context/` (`MeContext`, `ToastContext`) — supporting
@@ -90,7 +96,7 @@ follow-ups, and generate reports.
 - `supabase/migrations/` — same content split for `supabase db push` workflows
 - `supabase/import-history.sql` — one-time historical data load (27 people, Mar–Jul 2026);
   idempotent; run AFTER the schema
-- `supabase/upgrade-v3.sql` through `upgrade-v12.sql` — only for databases created from older
+- `supabase/upgrade-v3.sql` through `upgrade-v13.sql` — only for databases created from older
   schema versions; NOT needed on fresh installs
 - `supabase/templates/` — the branded auth emails GoTrue sends: `reset-password.html`
   (forgot-password link) and `invite.html` (new staff member's first sign in). Same shell as
@@ -105,6 +111,14 @@ follow-ups, and generate reports.
   same customization, whether viewed on screen or emailed.
 - `supabase/functions/send-followups` — optional Edge Function: auto-sends WhatsApp follow-ups
   via Meta WhatsApp Cloud API (requires approved template `next_steps_followup`)
+- `supabase/functions/whatsapp-send` + `whatsapp-webhook` — the two halves of the in-app
+  WhatsApp chat (see "WhatsApp" below). `-send` is called from the browser by a signed-in
+  staff member and does the authorisation itself (director anyone, support only
+  `support_visible_person()`, leader never); `-webhook` is called by Meta with no session, so
+  it deploys `--no-verify-jwt` and authenticates by verifying Meta's `X-Hub-Signature-256`
+  against `WHATSAPP_APP_SECRET` instead. It fails closed: no app secret configured means every
+  POST is rejected, because the alternative is a public endpoint anyone can post fabricated
+  newcomer messages into.
 - `supabase/functions/manage-staff` — powers the Team pane (director-only): invite, remove, or
   re-role staff without hand-running SQL. Deploy it (`supabase functions deploy manage-staff`)
   for that pane to work; without it, role management still falls back to the manual SQL in
@@ -172,6 +186,35 @@ Three staff roles, checked by `public.is_director()` / `is_leader()` / `is_suppo
 - The no-show rule (1-3 steps done, not seen since last Sunday) is duplicated in both
   `support_visible_person()` (SQL) and the Follow-Up Centre's no-show list
   (`src/hooks/useFollowUp.js`) — keep them in sync if either changes.
+
+## WhatsApp (Cloud API)
+- **Everything to a newcomer goes from the church's own number**, not from whoever tapped the
+  button (org decision, 16 Sep 2026). `wa.me` links are gone from Follow-Up and the Support
+  pages. The one deliberate survivor is Reports' "Send to leader" — that is staff messaging
+  staff, not the church messaging a newcomer.
+- **Consequence: leaders can no longer send.** They could before, from their own phone. The
+  church number is written to through the database's own rules, and leaders are read-only, so
+  the Send buttons are director-only now (support keeps its own scoped send).
+- **The 24-hour customer service window** is the rule that shapes all of this. WhatsApp only
+  permits free-form business messages within 24 hours of the person's last inbound message;
+  outside it, only pre-approved templates. Encoded in three places on purpose:
+  `wa_window_open()` in SQL, a refusal in `whatsapp-send`, and the greyed-out compose box in
+  `ChatPanel`. The UI copy is a courtesy; the function is what keeps us compliant.
+- **One approved template per wording.** Meta approves each set of words separately, so
+  `MSG_ATTENDED`, `MSG_COMPLETED` and `MSG_NOSHOW` each need their own. Only the attended one
+  (`next_steps_followup`) exists; the other two are refused with a clear on-screen message
+  until `WHATSAPP_TEMPLATE_COMPLETED` / `WHATSAPP_TEMPLATE_NOSHOW` are set, rather than
+  quietly sending the wrong words.
+- **`MSG_ATTENDED` must stay word for word identical to the approved template.** If it drifts,
+  the chat shows people something they never received.
+- Meta classifies the follow-up copy as **Marketing**, not Utility: Utility means
+  transactional, about an existing order or account. Marketing costs more per message and
+  expects people to have been told they'll be messaged, which is why the check-in form says so
+  above the phone field. That line is a condition of the category, not decoration.
+- `whatsapp_messages` is written **only** by the two Edge Functions (service_role). Staff read
+  it and never insert, which is why there is no INSERT policy for `authenticated`. `person_id`
+  is nullable so a message from an unknown number is kept rather than dropped; those rows are
+  visible to director/leader only, never support.
 
 ## Brand & UI conventions
 - Colours from the logo: orange `#F25125`, charcoal `#454B59` / `#313743`, cream `#EFEBE2`.
