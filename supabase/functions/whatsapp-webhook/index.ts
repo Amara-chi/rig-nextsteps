@@ -17,7 +17,7 @@
 //                           into Meta's Callback URL form
 //   WHATSAPP_APP_SECRET   - the app secret from Meta > App settings > Basic
 // Optional, for email alerts (the church's own SMTP, no third party):
-//   SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM
+//   SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM, SMTP_FROM_NAME
 //   NOTIFY_EMAILS - comma-separated recipients
 //   APP_URL       - defaults to the live admin app
 // With SMTP_HOST unset, email is skipped silently and the in-app badge is
@@ -80,8 +80,15 @@ async function notify(items: Item[]) {
     },
   });
   try {
+    // Mail clients show the display name, not the address, so without this
+    // every alert reads as "info@rigchurchlagos.org". If SMTP_FROM already
+    // carries its own "Name <address>" form, it is left alone.
+    const fromAddr = Deno.env.get("SMTP_FROM") ?? Deno.env.get("SMTP_USER") ?? "";
+    const fromName = Deno.env.get("SMTP_FROM_NAME") ?? "Rig Church Lagos";
+    const from = fromAddr.includes("<") ? fromAddr : `${fromName} <${fromAddr}>`;
+
     await client.send({
-      from: Deno.env.get("SMTP_FROM") ?? Deno.env.get("SMTP_USER") ?? "",
+      from,
       to,
       subject: subjectFor(items),
       // Both parts, so a client that refuses HTML still gets the message.
