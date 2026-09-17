@@ -116,6 +116,16 @@ follow-ups, and generate reports.
   same customization, whether viewed on screen or emailed.
 - `supabase/functions/send-followups` — optional Edge Function: auto-sends WhatsApp follow-ups
   via Meta WhatsApp Cloud API (requires approved template `next_steps_followup`)
+- `supabase/functions/_shared/` — `email.ts` (the one email shell: banner, arch, CTA, plus
+  `quote`/`section` blocks) and `mailer.ts` (SMTP send). Shared so the church's emails can't
+  drift into looking like three different senders. Port decides the TLS mode: 465 is implicit
+  TLS, anything else STARTTLS, and Hostinger's 587/STARTTLS path fails inside denomailer
+  ("invalid cmd" during the handshake), so 465 is the working setting.
+- `supabase/functions/weekly-digest` — optional Edge Function: the Monday 06:00 Lagos email of
+  what's waiting (unanswered conversations, the To send queue, who completed Next Steps, whose
+  membership window has passed, house church waiting on placement, no-shows). It only ever
+  REPORTS: recording membership and placing someone in a house church stay human decisions, so
+  it names who is waiting and never moves anyone. Sends nothing at all on a quiet week.
 - `supabase/functions/whatsapp-send` + `whatsapp-webhook` — the two halves of the in-app
   WhatsApp chat (see "WhatsApp" below). `-send` is called from the browser by a signed-in
   staff member and does the authorisation itself (director anyone, support only
@@ -235,6 +245,16 @@ Three staff roles, checked by `public.is_director()` / `is_leader()` / `is_suppo
   it and never insert, which is why there is no INSERT policy for `authenticated`. `person_id`
   is nullable so a message from an unknown number is kept rather than dropped; those rows are
   visible to director/leader only, never support.
+
+## Notifications
+- **Deliberately not a notifications centre** (decision, 17 Sep 2026). A bell and a feed would
+  be a second inbox to read, clear and eventually ignore, and it would mostly duplicate the two
+  badges that already sit on the panes you'd click anyway. What was actually missing was the
+  time-based milestones, which nothing surfaced: the 30-day membership window opening, that
+  window elapsing, house-church-eligible people waiting on the overseer. `weekly-digest` covers
+  those, and it arrives on a Monday morning, when the follow-up work actually happens.
+- The in-app badges are the live signal (Follow-Up's queue, Messages' unread conversations);
+  email is the nudge for people who aren't in the app that day. Neither is the record.
 
 ## Brand & UI conventions
 - Colours from the logo: orange `#F25125`, charcoal `#454B59` / `#313743`, cream `#EFEBE2`.

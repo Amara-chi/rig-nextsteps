@@ -24,8 +24,8 @@
 // still the source of truth. Email is a convenience, never the record.
 // ============================================================
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
 import { htmlFor, subjectFor, textFor, type Item } from "./email.ts";
+import { mailRecipients, sendMail } from "../_shared/mailer.ts";
 
 const admin = createClient(
   Deno.env.get("SUPABASE_URL")!,
@@ -62,43 +62,13 @@ async function signatureValid(raw: string, header: string | null) {
 // "something unread" triggers it, so an ongoing back-and-forth stays quiet
 // until someone reads it in the app.
 async function notify(items: Item[]) {
-  const host = Deno.env.get("SMTP_HOST");
-  const to = (Deno.env.get("NOTIFY_EMAILS") ?? "").split(",").map((e) => e.trim()).filter(Boolean);
-  if (!host || to.length === 0 || items.length === 0) return;
-
+  if (items.length === 0 || mailRecipients().length === 0) return;
   const appUrl = Deno.env.get("APP_URL") ?? "https://nextsteps.rigchurchlagos.org";
-  console.log(`notify: sending to ${to.length} recipient(s) via ${host}:${Deno.env.get("SMTP_PORT") ?? 587}`);
-  const client = new SMTPClient({
-    connection: {
-      hostname: host,
-      port: Number(Deno.env.get("SMTP_PORT") ?? 587),
-      tls: Number(Deno.env.get("SMTP_PORT") ?? 587) === 465,
-      auth: {
-        username: Deno.env.get("SMTP_USER") ?? "",
-        password: Deno.env.get("SMTP_PASS") ?? "",
-      },
-    },
+  await sendMail({
+    subject: subjectFor(items),
+    text: textFor(items, appUrl),
+    html: htmlFor(items, appUrl),
   });
-  try {
-    // Mail clients show the display name, not the address, so without this
-    // every alert reads as "info@rigchurchlagos.org". If SMTP_FROM already
-    // carries its own "Name <address>" form, it is left alone.
-    const fromAddr = Deno.env.get("SMTP_FROM") ?? Deno.env.get("SMTP_USER") ?? "";
-    const fromName = Deno.env.get("SMTP_FROM_NAME") ?? "Rig Church Lagos";
-    const from = fromAddr.includes("<") ? fromAddr : `${fromName} <${fromAddr}>`;
-
-    await client.send({
-      from,
-      to,
-      subject: subjectFor(items),
-      // Both parts, so a client that refuses HTML still gets the message.
-      content: textFor(items, appUrl),
-      html: htmlFor(items, appUrl),
-    });
-    console.log("notify: sent");
-  } finally {
-    await client.close();
-  }
 }
 
 Deno.serve(async (req) => {
