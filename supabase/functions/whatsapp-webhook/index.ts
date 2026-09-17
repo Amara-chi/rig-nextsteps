@@ -71,6 +71,7 @@ async function notify(items: { name: string; body: string }[]) {
     : `${items.length} new WhatsApp replies`;
   const lines = items.map((i) => `${i.name}:\n${i.body}`).join("\n\n");
 
+  console.log(`notify: sending to ${to.length} recipient(s) via ${host}:${Deno.env.get("SMTP_PORT") ?? 587}`);
   const client = new SMTPClient({
     connection: {
       hostname: host,
@@ -89,6 +90,7 @@ async function notify(items: { name: string; body: string }[]) {
       subject,
       content: `${lines}\n\nReply in the app: ${appUrl}\n`,
     });
+    console.log("notify: sent");
   } finally {
     await client.close();
   }
@@ -187,7 +189,9 @@ Deno.serve(async (req) => {
   // 200 and retries the whole batch if it doesn't get one, so an SMTP server
   // having a slow morning must not turn into duplicate webhook deliveries.
   if (pending.length > 0) {
-    const task = notify(pending).catch(() => {});
+    const task = notify(pending).catch((e) => {
+      console.error("notify failed:", e instanceof Error ? `${e.name}: ${e.message}` : String(e));
+    });
     const rt = (globalThis as any).EdgeRuntime;
     if (rt?.waitUntil) rt.waitUntil(task); else await task;
   }
