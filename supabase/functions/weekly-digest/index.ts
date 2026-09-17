@@ -19,11 +19,12 @@
 // session:
 //   supabase functions deploy weekly-digest --no-verify-jwt
 // Then schedule it for Monday 06:00 Lagos: 0 5 * * 1
-// Secrets: the SMTP_* set, NOTIFY_EMAILS, APP_URL (optional)
+// Secrets: the SMTP_* set, DIGEST_EMAILS (leadership; falls back to
+//          NOTIFY_EMAILS if unset), APP_URL (optional)
 // ============================================================
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { section, shell } from "../_shared/email.ts";
-import { mailRecipients, sendMail } from "../_shared/mailer.ts";
+import { recipients, sendMail } from "../_shared/mailer.ts";
 
 const admin = createClient(
   Deno.env.get("SUPABASE_URL")!,
@@ -104,9 +105,11 @@ Deno.serve(async () => {
     noshows.length ? `No-shows:\n${noshows.join("\n")}` : "",
   ].filter(Boolean).join("\n\n") + `\n\nOpen the app: ${appUrl}\n`;
 
-  if (mailRecipients().length === 0) return json({ ok: false, error: "NOTIFY_EMAILS is not set" }, 400);
+  const to = recipients("DIGEST_EMAILS", "NOTIFY_EMAILS");
+  if (to.length === 0) return json({ ok: false, error: "neither DIGEST_EMAILS nor NOTIFY_EMAILS is set" }, 400);
 
   await sendMail({
+    to,
     subject: `Next Steps — this week's follow-up`,
     text,
     html: shell({

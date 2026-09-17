@@ -25,7 +25,7 @@
 // ============================================================
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { htmlFor, subjectFor, textFor, type Item } from "./email.ts";
-import { mailRecipients, sendMail } from "../_shared/mailer.ts";
+import { recipients, sendMail } from "../_shared/mailer.ts";
 
 const admin = createClient(
   Deno.env.get("SUPABASE_URL")!,
@@ -62,9 +62,11 @@ async function signatureValid(raw: string, header: string | null) {
 // "something unread" triggers it, so an ongoing back-and-forth stays quiet
 // until someone reads it in the app.
 async function notify(items: Item[]) {
-  if (items.length === 0 || mailRecipients().length === 0) return;
+  const to = recipients("NOTIFY_EMAILS");
+  if (items.length === 0 || to.length === 0) return;
   const appUrl = Deno.env.get("APP_URL") ?? "https://nextsteps.rigchurchlagos.org";
   await sendMail({
+    to,
     subject: subjectFor(items),
     text: textFor(items, appUrl),
     html: htmlFor(items, appUrl),

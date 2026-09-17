@@ -117,7 +117,10 @@ follow-ups, and generate reports.
 - `supabase/functions/send-followups` — optional Edge Function: auto-sends WhatsApp follow-ups
   via Meta WhatsApp Cloud API (requires approved template `next_steps_followup`)
 - `supabase/functions/_shared/` — `email.ts` (the one email shell: banner, arch, CTA, plus
-  `quote`/`section` blocks) and `mailer.ts` (SMTP send). Shared so the church's emails can't
+  `quote`/`section` blocks) and `mailer.ts` (SMTP send). Two audiences, deliberately separate:
+  `NOTIFY_EMAILS` is operational (someone is waiting on a reply now) and `DIGEST_EMAILS` is
+  leadership's Monday picture. The digest falls back to `NOTIFY_EMAILS`, so an unset secret
+  means "the same people as before" rather than a digest that silently goes nowhere. Shared so the church's emails can't
   drift into looking like three different senders. Port decides the TLS mode: 465 is implicit
   TLS, anything else STARTTLS, and Hostinger's 587/STARTTLS path fails inside denomailer
   ("invalid cmd" during the handshake), so 465 is the working setting.

@@ -6,13 +6,22 @@
 // the handshake), so 465 is the working setting here.
 import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
 
-export function mailRecipients() {
-  return (Deno.env.get("NOTIFY_EMAILS") ?? "").split(",").map((e) => e.trim()).filter(Boolean);
+// Two audiences, deliberately separate: NOTIFY_EMAILS is operational (a
+// newcomer is waiting on a reply, whoever is on duty needs to know now) and
+// DIGEST_EMAILS is leadership's Monday picture. DIGEST_EMAILS falls back to
+// NOTIFY_EMAILS so an unset secret means "same people as before" rather than
+// a digest that silently goes nowhere.
+export function recipients(...envNames: string[]) {
+  for (const name of envNames) {
+    const list = (Deno.env.get(name) ?? "").split(",").map((e) => e.trim()).filter(Boolean);
+    if (list.length > 0) return list;
+  }
+  return [];
 }
 
-export async function sendMail(opts: { subject: string; text: string; html: string }) {
+export async function sendMail(opts: { to: string[]; subject: string; text: string; html: string }) {
   const host = Deno.env.get("SMTP_HOST");
-  const to = mailRecipients();
+  const to = opts.to;
   if (!host || to.length === 0) return false;   // email is a convenience, never the record
 
   const port = Number(Deno.env.get("SMTP_PORT") ?? 587);
