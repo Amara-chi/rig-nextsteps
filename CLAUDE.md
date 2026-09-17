@@ -63,7 +63,9 @@ follow-ups, and generate reports.
   Follow-Up's "Open chat" and the Support pages' "WhatsApp" button; the caller passes
   `completed` because a Follow-Up person row and a Support one don't carry the same fields),
   `Sidebar`/`BottomNav`/`Pane`, `Toast`, `VideoFallbackModal`.
-- `src/hooks/` — `useAuth`, `useAppData` (people/session/checkins/session-feed, polled every
+- `src/hooks/` — `useAuth`, `useMessages` (the Messages pane's conversation list and the nav's
+  unread badge, polled; not loaded for support, which reaches conversations through its own
+  three pages), `useAppData` (people/session/checkins/session-feed, polled every
   10s for non-support roles), `useFollowUp`, `useSupportPeople` (the support role's own
   `v_support_people`-backed data, also polled), `useReports`, `usePolling` (generic
   `setInterval` + `document.hidden` guard), `useToast`.
@@ -96,7 +98,7 @@ follow-ups, and generate reports.
 - `supabase/migrations/` — same content split for `supabase db push` workflows
 - `supabase/import-history.sql` — one-time historical data load (27 people, Mar–Jul 2026);
   idempotent; run AFTER the schema
-- `supabase/upgrade-v3.sql` through `upgrade-v13.sql` — only for databases created from older
+- `supabase/upgrade-v3.sql` through `upgrade-v14.sql` — only for databases created from older
   schema versions; NOT needed on fresh installs
 - `supabase/templates/` — the branded auth emails GoTrue sends: `reset-password.html`
   (forgot-password link) and `invite.html` (new staff member's first sign in). Same shell as
@@ -211,6 +213,21 @@ Three staff roles, checked by `public.is_director()` / `is_leader()` / `is_suppo
   transactional, about an existing order or account. Marketing costs more per message and
   expects people to have been told they'll be messaged, which is why the check-in form says so
   above the phone field. That line is a condition of the category, not decoration.
+- **Unread is shared across staff, not per person** (org decision, 17 Sep 2026). One church
+  inbox: whoever opens a conversation marks it read for everybody. Per-user unread was
+  considered and rejected, because it lets two people answer the same newcomer without either
+  realising. Staff have no UPDATE on the table, so `ChatPanel` clears it through the
+  `wa_mark_read()` RPC, which re-checks visibility itself rather than trusting the caller.
+- **The Messages pane exists because conversations outlive the follow-up lifecycle.** Once an
+  outcome is logged a person drops off Follow-Up's lists, so before this pane a reply from
+  them landed in the database and was seen by nobody. `v_wa_conversations` is keyed on
+  person_id, falling back to phone, so a message from a number not on file is still visible
+  rather than orphaned.
+- **Email alerts go through the church's own SMTP**, not Resend (the account already exists for
+  `info@rigchurchlagos.org`). One email per conversation that needs attention, not one per
+  message: only the message that takes a conversation from nothing-unread to something-unread
+  sends one. With `SMTP_HOST` unset, email is skipped silently, and the in-app badge is the
+  source of truth either way. Email is a convenience, never the record.
 - `whatsapp_messages` is written **only** by the two Edge Functions (service_role). Staff read
   it and never insert, which is why there is no INSERT policy for `authenticated`. `person_id`
   is nullable so a message from an unknown number is kept rather than dropped; those rows are

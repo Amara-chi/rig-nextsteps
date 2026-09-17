@@ -1,4 +1,4 @@
-export default function BottomNav({ nav, activePane, onNavigate, followupCount = 0 }) {
+export default function BottomNav({ nav, activePane, onNavigate, counts = {} }) {
   return (
     <nav className="hidden max-mobile:flex fixed bottom-0 left-0 right-0 z-100 bg-ink-deep pt-2 px-1.5 pb-[calc(8px+env(safe-area-inset-bottom))] justify-around">
       {nav.map((n) => (
@@ -14,9 +14,9 @@ export default function BottomNav({ nav, activePane, onNavigate, followupCount =
             {n.icon}
           </svg>
           {n.label}
-          {n.cnt && followupCount > 0 && (
+          {n.cnt && counts[n.cnt] > 0 && (
             <span className="absolute top-0 right-0.5 bg-orange text-white rounded-full text-[8.5px] py-0.25 px-1.25">
-              {followupCount}
+              {counts[n.cnt]}
             </span>
           )}
         </button>

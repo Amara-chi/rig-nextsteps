@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import Avatar from './Avatar.jsx'
 
-export default function Sidebar({ nav, activePane, onNavigate, me, onSignOut, followupCount = 0 }) {
+export default function Sidebar({ nav, activePane, onNavigate, me, onSignOut, counts = {} }) {
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem('ns_side_collapsed') === '1')
 
   useEffect(() => {
@@ -44,9 +44,9 @@ export default function Sidebar({ nav, activePane, onNavigate, me, onSignOut, fo
               {n.icon}
             </svg>
             {!collapsed && <span>{n.label}</span>}
-            {!collapsed && n.cnt && followupCount > 0 && (
+            {!collapsed && n.cnt && counts[n.cnt] > 0 && (
               <span className={`ml-auto rounded-full py-0.25 px-2 text-[10.5px] font-bold ${activePane === n.id ? 'bg-white/25' : 'bg-white/14'}`}>
-                {followupCount}
+                {counts[n.cnt]}
               </span>
             )}
           </button>

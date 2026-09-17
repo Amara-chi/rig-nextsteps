@@ -16,8 +16,15 @@
 //   WHATSAPP_VERIFY_TOKEN - any random string; must match what you type
 //                           into Meta's Callback URL form
 //   WHATSAPP_APP_SECRET   - the app secret from Meta > App settings > Basic
+// Optional, for email alerts (the church's own SMTP, no third party):
+//   SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM
+//   NOTIFY_EMAILS - comma-separated recipients
+//   APP_URL       - defaults to the live admin app
+// With SMTP_HOST unset, email is skipped silently and the in-app badge is
+// still the source of truth. Email is a convenience, never the record.
 // ============================================================
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
 
 const admin = createClient(
   Deno.env.get("SUPABASE_URL")!,
@@ -48,6 +55,45 @@ async function signatureValid(raw: string, header: string | null) {
   return diff === 0;
 }
 
+// One email per conversation that needs attention, not one per message: a
+// newcomer sending four lines in a row is still one thing for staff to deal
+// with. Only the message that takes a conversation from "nothing unread" to
+// "something unread" triggers it, so an ongoing back-and-forth stays quiet
+// until someone reads it in the app.
+async function notify(items: { name: string; body: string }[]) {
+  const host = Deno.env.get("SMTP_HOST");
+  const to = (Deno.env.get("NOTIFY_EMAILS") ?? "").split(",").map((e) => e.trim()).filter(Boolean);
+  if (!host || to.length === 0 || items.length === 0) return;
+
+  const appUrl = Deno.env.get("APP_URL") ?? "https://nextsteps.rigchurchlagos.org";
+  const subject = items.length === 1
+    ? `New WhatsApp reply from ${items[0].name}`
+    : `${items.length} new WhatsApp replies`;
+  const lines = items.map((i) => `${i.name}:\n${i.body}`).join("\n\n");
+
+  const client = new SMTPClient({
+    connection: {
+      hostname: host,
+      port: Number(Deno.env.get("SMTP_PORT") ?? 587),
+      tls: Number(Deno.env.get("SMTP_PORT") ?? 587) === 465,
+      auth: {
+        username: Deno.env.get("SMTP_USER") ?? "",
+        password: Deno.env.get("SMTP_PASS") ?? "",
+      },
+    },
+  });
+  try {
+    await client.send({
+      from: Deno.env.get("SMTP_FROM") ?? Deno.env.get("SMTP_USER") ?? "",
+      to,
+      subject,
+      content: `${lines}\n\nReply in the app: ${appUrl}\n`,
+    });
+  } finally {
+    await client.close();
+  }
+}
+
 Deno.serve(async (req) => {
   const url = new URL(req.url);
 
@@ -71,6 +117,8 @@ Deno.serve(async (req) => {
 
   let payload: any;
   try { payload = JSON.parse(raw); } catch { return new Response("ok", { status: 200 }); }
+
+  const pending: { name: string; body: string }[] = [];
 
   for (const entry of payload?.entry ?? []) {
     for (const change of entry?.changes ?? []) {
@@ -104,6 +152,23 @@ Deno.serve(async (req) => {
             ? new Date(Number(m.timestamp) * 1000).toISOString()
             : new Date().toISOString(),
         }, { onConflict: "wa_message_id", ignoreDuplicates: true });
+
+        // Notify only when this is the one that made the conversation
+        // unread. A retry of a message we already stored leaves the count
+        // unchanged and so sends nothing, which is what we want.
+        if (person?.id) {
+          const { count } = await admin
+            .from("whatsapp_messages")
+            .select("id", { count: "exact", head: true })
+            .eq("person_id", person.id).eq("direction", "in").is("read_at", null);
+          if (count === 1) {
+            const { data: p } = await admin
+              .from("people").select("full_name").eq("id", person.id).maybeSingle();
+            pending.push({ name: p?.full_name ?? phone, body });
+          }
+        } else {
+          pending.push({ name: `Unknown number ${phone}`, body });
+        }
       }
 
       // --- Delivery receipts for messages we sent ---
@@ -116,6 +181,15 @@ Deno.serve(async (req) => {
         }).eq("wa_message_id", s.id);
       }
     }
+  }
+
+  // Email after the response where the runtime allows it. Meta wants a fast
+  // 200 and retries the whole batch if it doesn't get one, so an SMTP server
+  // having a slow morning must not turn into duplicate webhook deliveries.
+  if (pending.length > 0) {
+    const task = notify(pending).catch(() => {});
+    const rt = (globalThis as any).EdgeRuntime;
+    if (rt?.waitUntil) rt.waitUntil(task); else await task;
   }
 
   // Always 200 once the signature checks out. A non-200 makes Meta retry the

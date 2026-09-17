@@ -21,13 +21,17 @@ const WINDOW_MS = 24 * 3600 * 1000
 // completed picks which approved template the fallback button sends. The
 // caller decides it, because a person row from the Follow-Up Centre and one
 // from the Support pages don't carry the same fields.
-export default function ChatPanel({ person, completed = false, onClose, onSent }) {
+export default function ChatPanel({ person, completed = false, onClose, onSent, onRead }) {
   const me = useMe()
   const toast = useAppToast()
   const [messages, setMessages] = useState(null) // null = still loading
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
   const endRef = useRef(null)
+  // Kept in a ref so load() doesn't need it as a dependency, which would
+  // re-create the poller every time the parent re-renders.
+  const onReadRef = useRef(onRead)
+  onReadRef.current = onRead
 
   const canSend = me?.role === 'director' || me?.role === 'support'
 
@@ -35,11 +39,19 @@ export default function ChatPanel({ person, completed = false, onClose, onSent }
     if (!person?.id) return
     const { data } = await supabase
       .from('whatsapp_messages')
-      .select('id, direction, body, status, error, created_at')
+      .select('id, direction, body, status, error, read_at, created_at')
       .eq('person_id', person.id)
       .order('created_at', { ascending: true })
       .limit(200)
     setMessages(data || [])
+
+    // Read state is shared across staff, so having the conversation open is
+    // what marks it read for everyone. Staff have no UPDATE on the table;
+    // wa_mark_read() re-checks visibility and does it server-side.
+    if ((data || []).some((m) => m.direction === 'in' && !m.read_at)) {
+      await supabase.rpc('wa_mark_read', { p_person_id: person.id })
+      onReadRef.current?.()
+    }
   }, [person?.id])
 
   useEffect(() => { load() }, [load])

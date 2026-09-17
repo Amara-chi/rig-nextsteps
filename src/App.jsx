@@ -4,6 +4,7 @@ import { useToast } from './hooks/useToast.js'
 import { useAppData } from './hooks/useAppData.js'
 import { useFollowUp } from './hooks/useFollowUp.js'
 import { useSupportPeople } from './hooks/useSupportPeople.js'
+import { useMessages } from './hooks/useMessages.js'
 import { MeProvider } from './context/MeContext.jsx'
 import { ToastProvider } from './context/ToastContext.jsx'
 import { NAV_FULL, NAV_PROFILE, NAV_SUPPORT, NAV_TEAM } from './nav.jsx'
@@ -21,6 +22,7 @@ import VideosPage from './pages/VideosPage.jsx'
 import People from './pages/People.jsx'
 import FollowUp from './pages/FollowUp.jsx'
 import Reports from './pages/Reports.jsx'
+import Messages from './pages/Messages.jsx'
 import SupportHouseChurch from './pages/SupportHouseChurch.jsx'
 import SupportFollowUp from './pages/SupportFollowUp.jsx'
 import SupportMembership from './pages/SupportMembership.jsx'
@@ -40,6 +42,7 @@ export default function App() {
   const { people, openSession, todaysCheckins, sessionFeed, refreshAll } = useAppData(me)
   const followUp = useFollowUp(me, people)
   const support = useSupportPeople(me)
+  const messages = useMessages(me)
   const [fallbackUrl, setFallbackUrl] = useState(null)
 
   const nav = useMemo(() => {
@@ -47,6 +50,14 @@ export default function App() {
     if (me.role === 'support') return [...NAV_SUPPORT, NAV_PROFILE]
     return me.role === 'director' ? [...NAV_FULL, NAV_TEAM, NAV_PROFILE] : [...NAV_FULL, NAV_PROFILE]
   }, [me])
+
+  // Follow-Up badges the queue waiting to be sent; Messages badges
+  // conversations with something unread, not the raw message count — ten
+  // messages from one person is one thing to deal with.
+  const navCounts = {
+    followup: followUp.attended.length,
+    messages: messages.unreadCount,
+  }
 
   const [activePane, setActivePane] = useState(null)
   const pane = activePane ?? (me?.role === 'support' ? 'support-hc' : 'today')
@@ -62,7 +73,7 @@ export default function App() {
       <ToastProvider value={toastState}>
         <div className={BASE_CLASS}>
           <div className="flex min-h-dvh">
-            <Sidebar nav={nav} activePane={pane} onNavigate={setActivePane} me={me} onSignOut={signOut} followupCount={followUp.attended.length} />
+            <Sidebar nav={nav} activePane={pane} onNavigate={setActivePane} me={me} onSignOut={signOut} counts={navCounts} />
             <main className="flex-1 pt-7.5 px-9 pb-22.5 max-mobile:pt-5 max-mobile:px-4 max-mobile:pb-24 max-w-290 w-full">
               {me.role !== 'director' && <ReadonlyBanner />}
 
@@ -76,6 +87,9 @@ export default function App() {
                 <FollowUp people={people} attended={followUp.attended} awaiting={followUp.awaiting} noshows={followUp.noshows} STATUS_LABEL={followUp.STATUS_LABEL} refresh={followUp.refresh} />
               </Pane>
               <Pane active={pane === 'reports'}><Reports people={people} /></Pane>
+              <Pane active={pane === 'messages'}>
+                <Messages conversations={messages.conversations} people={people} refresh={messages.refresh} />
+              </Pane>
               <Pane active={pane === 'support-hc'}>
                 <SupportHouseChurch list={support.hc} hadError={support.hadError} refresh={support.refresh} />
               </Pane>
@@ -88,7 +102,7 @@ export default function App() {
               {me.role === 'director' && <Pane active={pane === 'team'}><Team /></Pane>}
               <Pane active={pane === 'profile'}><Profile onDataChange={refreshMe} /></Pane>
             </main>
-            <BottomNav nav={nav} activePane={pane} onNavigate={setActivePane} followupCount={followUp.attended.length} />
+            <BottomNav nav={nav} activePane={pane} onNavigate={setActivePane} counts={navCounts} />
           </div>
           <Toast html={toastHtml} visible={toastVisible} />
           <VideoFallbackModal url={fallbackUrl} onClose={() => setFallbackUrl(null)} />
