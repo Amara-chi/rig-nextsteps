@@ -104,7 +104,10 @@ follow-ups, and generate reports.
   (forgot-password link) and `invite.html` (new staff member's first sign in). Same shell as
   each other and as the report email's cream logo banner, so all three read as one system:
   table-based layout, inline styles only, `Arial` (webfonts don't survive most mail clients),
-  brand hexes hardcoded because an email can't reach `theme.css`. `config.toml`'s
+  brand hexes hardcoded because an email can't reach `theme.css`. The WhatsApp reply alert
+  (`functions/whatsapp-webhook/email.ts`) uses the same shell, so all of them read as one
+  system; keep the three in step. That one escapes the message body, since it is text a
+  newcomer wrote going straight into HTML. `config.toml`'s
   `[auth.email.template.*]` wiring only affects the LOCAL stack, so a hosted project needs the
   same HTML pasted into Dashboard → Authentication → Emails (or pushed with
   `supabase config push`); keep the two in step whenever a template changes.

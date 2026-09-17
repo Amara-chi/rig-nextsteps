@@ -25,6 +25,7 @@
 // ============================================================
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
+import { htmlFor, subjectFor, textFor, type Item } from "./email.ts";
 
 const admin = createClient(
   Deno.env.get("SUPABASE_URL")!,
@@ -60,17 +61,12 @@ async function signatureValid(raw: string, header: string | null) {
 // with. Only the message that takes a conversation from "nothing unread" to
 // "something unread" triggers it, so an ongoing back-and-forth stays quiet
 // until someone reads it in the app.
-async function notify(items: { name: string; body: string }[]) {
+async function notify(items: Item[]) {
   const host = Deno.env.get("SMTP_HOST");
   const to = (Deno.env.get("NOTIFY_EMAILS") ?? "").split(",").map((e) => e.trim()).filter(Boolean);
   if (!host || to.length === 0 || items.length === 0) return;
 
   const appUrl = Deno.env.get("APP_URL") ?? "https://nextsteps.rigchurchlagos.org";
-  const subject = items.length === 1
-    ? `New WhatsApp reply from ${items[0].name}`
-    : `${items.length} new WhatsApp replies`;
-  const lines = items.map((i) => `${i.name}:\n${i.body}`).join("\n\n");
-
   console.log(`notify: sending to ${to.length} recipient(s) via ${host}:${Deno.env.get("SMTP_PORT") ?? 587}`);
   const client = new SMTPClient({
     connection: {
@@ -87,8 +83,10 @@ async function notify(items: { name: string; body: string }[]) {
     await client.send({
       from: Deno.env.get("SMTP_FROM") ?? Deno.env.get("SMTP_USER") ?? "",
       to,
-      subject,
-      content: `${lines}\n\nReply in the app: ${appUrl}\n`,
+      subject: subjectFor(items),
+      // Both parts, so a client that refuses HTML still gets the message.
+      content: textFor(items, appUrl),
+      html: htmlFor(items, appUrl),
     });
     console.log("notify: sent");
   } finally {
@@ -120,7 +118,7 @@ Deno.serve(async (req) => {
   let payload: any;
   try { payload = JSON.parse(raw); } catch { return new Response("ok", { status: 200 }); }
 
-  const pending: { name: string; body: string }[] = [];
+  const pending: Item[] = [];
 
   for (const entry of payload?.entry ?? []) {
     for (const change of entry?.changes ?? []) {
