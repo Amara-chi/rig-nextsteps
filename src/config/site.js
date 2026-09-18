@@ -54,6 +54,6 @@ export const stepOf = (n) => STEPS[n - 1] || { title: '?', video: '' }
 // template "next_steps_followup", so the one-tap send and the optional
 // scheduled send read as the same church. It takes no [Step], so the approved
 // template has a single variable, {{1}} = first name.
-export const MSG_ATTENDED = 'Hi [Name], this is Rig Church Lagos. We are glad you joined us at Next Steps today. We really hope you enjoyed your time with us, and we would love to see you again soon. Have a wonderful week!'
+export const MSG_ATTENDED = 'Hi [Name], this is Rig Church Lagos. We are glad you joined us at Next Steps. We really hope you enjoyed your time with us, and we would love to see you again soon. Have a wonderful week!'
 export const MSG_COMPLETED = "[Name], congratulations on completing Next Steps! We're celebrating you. Someone from leadership will be in touch about what comes next."
 export const MSG_NOSHOW = "Hi [Name], it's the Next Steps team at RIG Church. Just wanted to check in and see how you're doing — we missed you this Sunday. No pressure, just wanted to connect."

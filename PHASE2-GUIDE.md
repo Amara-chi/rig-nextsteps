@@ -62,7 +62,7 @@ This is the "messages send themselves" upgrade. It uses Meta's **official WhatsA
 
 1. **Meta setup:** create a Meta developer account (developers.facebook.com), create an app, add the **WhatsApp** product, and connect a phone number for the church (this number becomes API-only — use a dedicated number, not the director's personal one). Generate a **permanent access token** via a system user, and note the **Phone Number ID**.
 2. **Template approval:** business-initiated WhatsApp messages must use pre-approved templates. In WhatsApp Manager, create a template named `next_steps_followup`, language **English** (plain `en`, not English (US) — the function sends `en` and a mismatch fails with error 132001), category **Marketing**, body (must match `MSG_ATTENDED` in `src/config/site.js` word for word):
-   > *Hi {{1}}, this is Rig Church Lagos. We are glad you joined us at Next Steps today. We really hope you enjoyed your time with us, and we would love to see you again soon. Have a wonderful week!*
+   > *Hi {{1}}, this is Rig Church Lagos. We are glad you joined us at Next Steps. We really hope you enjoyed your time with us, and we would love to see you again soon. Have a wonderful week!*
    
    Meta's classifier rejects this copy as Utility: Utility means transactional, about an existing order or account, and a warm "glad you joined us" note is not that. Marketing is the honest category. It costs more per message and expects people to have been told they'll be messaged, which is why the check-in form now says so above the phone field. Keep that line if the copy stays Marketing.
 
