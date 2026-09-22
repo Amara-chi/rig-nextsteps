@@ -8,13 +8,14 @@ import Modal from '../components/Modal.jsx'
 import Field, { TextInput, Select } from '../components/Field.jsx'
 import NotesThread from '../components/NotesThread.jsx'
 import EmptyState from '../components/EmptyState.jsx'
+import PeopleExport from '../components/PeopleExport.jsx'
 import { useMe } from '../context/MeContext.jsx'
 import { useAppToast } from '../context/ToastContext.jsx'
 import { supabase } from '../lib/supabaseClient.js'
 import { normPhoneJS } from '../lib/phone.js'
 import { fmtDate, fmtPhone, initials } from '../lib/format.js'
 import { todayStr } from '../lib/format.js'
-import { STEPS, stepOf, HEARD_OPTIONS } from '../config/site.js'
+import { STEPS, stepOf, HEARD_OPTIONS, isSuperAdmin } from '../config/site.js'
 
 function badgeFor(p) {
   if (p.member_since) return ['green', 'Member since ' + fmtDate(p.member_since)]
@@ -168,6 +169,11 @@ function PersonRow({ p, isDirector, onFlip, onEdit, onBackfill, onWelcome, onDel
 export default function People({ people, onDataChange }) {
   const me = useMe()
   const isDirector = me?.role === 'director'
+  // The export is Jody's alone (org decision, 22 Sep 2026) — a downloaded
+  // sheet of names, phones and emails leaves the platform's access controls
+  // behind, so it isn't offered to every admin. A UI gate, not a security
+  // boundary: RLS lets any admin read the same rows.
+  const canExport = isSuperAdmin(me)
   const toast = useAppToast()
   const [search, setSearch] = useState('')
 
@@ -259,7 +265,12 @@ export default function People({ people, onDataChange }) {
       <PageHead
         title="People"
         sub="Everyone in the Next Steps journey. Tap a row for details."
-        right={<input className="w-full max-w-80 py-2.75 px-3.5 border-[1.5px] border-line rounded-[11px] bg-white text-[13.5px]" type="search" placeholder="Search name or phone…" value={search} onChange={(e) => setSearch(e.target.value)} />}
+        right={
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <input className="w-full max-w-80 py-2.75 px-3.5 border-[1.5px] border-line rounded-[11px] bg-white text-[13.5px]" type="search" placeholder="Search name or phone…" value={search} onChange={(e) => setSearch(e.target.value)} />
+            {canExport && <PeopleExport rows={rows} total={people.length} filtered={!!q} />}
+          </div>
+        }
       />
       <div className="bg-white border border-line rounded-[14px] shadow-card py-5 px-5.5">
         <div className="overflow-x-auto">

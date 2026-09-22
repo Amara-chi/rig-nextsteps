@@ -22,6 +22,16 @@ export const HEARD_OPTIONS = ['A friend or family member', 'Instagram', 'WhatsAp
 // (e.g. "0803 000 0000"). Leave "" to pick the contact each time.
 export const LEADER_WHATSAPP = ''
 
+// The one named account that gets the powers no other admin has: re-roling
+// another admin (Team), and exporting the People list as a spreadsheet.
+// Must match manage-staff's own SUPER_ADMIN_EMAIL. Note this only decides
+// what the UI OFFERS — Team's real permission is enforced in the Edge
+// Function, and the People export is a convenience gate, not a security
+// boundary (RLS lets every admin read the same rows either way).
+export const SUPER_ADMIN_EMAIL = 'adewale.jody@gmail.com'
+
+export const isSuperAdmin = (me) => (me?.email || '').toLowerCase() === SUPER_ADMIN_EMAIL
+
 // Set to true ONLY after deploying the optional email-report add-on
 // (see PHASE2-GUIDE). Emails the weekly report to leadership automatically
 // when the director ends a session.
