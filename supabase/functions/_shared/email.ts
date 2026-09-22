@@ -107,16 +107,35 @@ export const quote = (label: string, text: string) => `
         </td>
       </tr>`;
 
-// A headed list of names, used by the Monday digest for each section.
-export const section = (title: string, items: string[], note?: string) => {
+// The at-a-glance strip: every number in one block at the top, so the
+// email answers "is there anything for me this week" before anyone scrolls.
+// A zero row still shows, greyed — "nothing waiting on a reply" is itself
+// worth knowing on a Monday.
+export const stats = (rows: { label: string; n: number }[]) => `
+      <tr>
+        <td style="padding:0 28px 18px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid #E6E0D2;border-radius:12px;">
+            ${rows.map((r, i) => `<tr>
+              <td style="padding:9px 14px;font-size:13.5px;color:${r.n ? "#454B59" : "#9AA0AE"};${i ? "border-top:1px solid #EFEBE2;" : ""}">${esc(r.label)}</td>
+              <td align="right" style="padding:9px 14px;font-size:16px;font-weight:bold;color:${r.n ? "#F25125" : "#C3C7D1"};${i ? "border-top:1px solid #EFEBE2;" : ""}">${r.n}</td>
+            </tr>`).join("")}
+          </table>
+        </td>
+      </tr>`;
+
+// A headed list of names. Capped: a digest nobody finishes reading is worse
+// than one that says "and 30 others" and trusts staff to open the app.
+export const section = (title: string, items: string[], cap = 5) => {
   if (items.length === 0) return "";
+  const shown = items.slice(0, cap);
+  const rest = items.length - shown.length;
   return `
       <tr>
-        <td style="padding:0 28px 16px;">
+        <td style="padding:0 28px 14px;">
           <div style="font-size:10px;letter-spacing:1.2px;text-transform:uppercase;color:#F25125;font-weight:bold;margin-bottom:7px;">${esc(title)}</div>
-          ${note ? `<div style="font-size:12px;color:#7A8090;margin-bottom:8px;">${esc(note)}</div>` : ""}
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid #E6E0D2;border-radius:12px;">
-            ${items.map((t, i) => `<tr><td style="padding:10px 14px;font-size:14px;color:#454B59;${i ? "border-top:1px solid #EFEBE2;" : ""}">${esc(t)}</td></tr>`).join("")}
+            ${shown.map((t, i) => `<tr><td style="padding:9px 14px;font-size:13.5px;color:#454B59;${i ? "border-top:1px solid #EFEBE2;" : ""}">${esc(t)}</td></tr>`).join("")}
+            ${rest > 0 ? `<tr><td style="padding:9px 14px;font-size:12.5px;color:#7A8090;border-top:1px solid #EFEBE2;">and ${rest} more in the app</td></tr>` : ""}
           </table>
         </td>
       </tr>`;

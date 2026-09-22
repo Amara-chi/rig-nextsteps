@@ -23,7 +23,7 @@
 //          NOTIFY_EMAILS if unset), APP_URL (optional)
 // ============================================================
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { section, shell } from "../_shared/email.ts";
+import { section, shell, stats } from "../_shared/email.ts";
 import { recipients, sendMail } from "../_shared/mailer.ts";
 
 const admin = createClient(
@@ -33,6 +33,13 @@ const admin = createClient(
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
+
+// How far back someone can have last attended and still count as this
+// week's no-show. Without a floor the rule ("1-3 steps, not seen since last
+// Sunday") never lets anyone go: someone who came once in March is still on
+// the list every Monday forever, and 42 names is a list nobody reads.
+// Pastoral call, not a technical one — change it if leadership wants to.
+const NOSHOW_WEEKS = 4;
 
 const dmy = (d: string | null) =>
   d ? new Date(d).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "";
@@ -70,8 +77,11 @@ Deno.serve(async () => {
   const now = new Date();
   const lastSunday = new Date(now);
   lastSunday.setDate(now.getDate() - now.getDay());
+  const floor = new Date(now.getTime() - NOSHOW_WEEKS * 7 * 864e5);
   const noshows = all
-    .filter((p) => p.steps_done > 0 && p.steps_done < 4 && p.last_seen && new Date(p.last_seen) < lastSunday)
+    .filter((p) => p.steps_done > 0 && p.steps_done < 4 && p.last_seen)
+    .filter((p) => new Date(p.last_seen) < lastSunday && new Date(p.last_seen) >= floor)
+    .sort((a, b) => (a.last_seen < b.last_seen ? 1 : -1))
     .map((p) => `${p.full_name} — ${p.steps_done} of 4, last seen ${dmy(p.last_seen)}`);
 
   const { count: toSend } = await admin
@@ -87,13 +97,22 @@ Deno.serve(async () => {
     return json({ ok: true, skipped: "nothing to report" });
   }
 
-  const body = [
-    section("Waiting on a reply", unanswered, "They messaged the church and nobody has answered yet."),
-    section("Follow-ups still to send", toSend ? [`${toSend} ${toSend === 1 ? "person is" : "people are"} in the To send queue`] : []),
-    section("Completed Next Steps this week", completed, "Their 30-day membership window is now open."),
-    section("Membership window has passed", ready, "Leadership's decision to make, not the app's."),
-    section("House church, waiting on placement", houseChurch, "Interested and through all four steps. Placement is the overseer's call."),
-    section("No-shows, Monday protocol", noshows, "Call first, text if no answer, then keep the door open."),
+  // Numbers first, names second. The strip answers "is there anything for
+  // me this week" without scrolling; the lists below are capped so the
+  // email stays glanceable and the app stays the place you go for the rest.
+  const body = stats([
+    { label: "Waiting on a reply", n: unanswered.length },
+    { label: "Follow-ups to send", n: toSend ?? 0 },
+    { label: "Completed Next Steps", n: completed.length },
+    { label: "Membership window passed", n: ready.length },
+    { label: "House church, awaiting placement", n: houseChurch.length },
+    { label: `No-shows (last ${NOSHOW_WEEKS} weeks)`, n: noshows.length },
+  ]) + [
+    section("Waiting on a reply", unanswered),
+    section("Completed Next Steps", completed),
+    section("Membership window has passed", ready),
+    section("House church, awaiting placement", houseChurch),
+    section("No-shows, Monday protocol", noshows, 3),
   ].join("");
 
   const text = [
@@ -118,7 +137,7 @@ Deno.serve(async () => {
         ? `${unanswered.length} conversation(s) waiting on a reply`
         : "This week's Next Steps follow-up",
       heading: "This week.",
-      lead: "Everything waiting on the team, as of Monday morning.",
+      lead: "Where things stand on Monday morning. Full lists are in the app.",
       body,
       ctaHref: appUrl,
       ctaLabel: "Open the app",
