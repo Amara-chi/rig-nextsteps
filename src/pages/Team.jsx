@@ -33,6 +33,10 @@ export default function Team() {
   const [inviteName, setInviteName] = useState('')
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviteRole, setInviteRole] = useState('leader')
+  // What the function handed back after adding someone: shown in its own
+  // box so the director can read the password out or copy it, rather than
+  // in a toast that disappears.
+  const [created, setCreated] = useState(null)
   const [removeTarget, setRemoveTarget] = useState(null)
 
   const load = useCallback(async () => {
@@ -76,12 +80,14 @@ export default function Team() {
     if (!email) { toast('Enter an email address.'); return false }
     const res = await callStaffFn({ action: 'invite', email, full_name, role: inviteRole, redirect_to: window.location.origin + '/' })
     if (!res.ok) { toast("Couldn't add them — " + staffErrMsg(res.error)); return false }
-    // The account exists either way. If no email went out (SMTP not set up,
-    // or it failed) the function hands the password back so the director
-    // can pass it on themselves, and it is shown exactly once, here.
-    if (res.emailed) toast(`Done — their sign-in details have been emailed to <b>${email}</b>.`)
-    else if (res.password) toast(`Added, but the email couldn't be sent. Give them this password: <b>${res.password}</b>`, 20000)
-    else toast(`Invite sent to <b>${email}</b>.`) // the pre-12-Oct function (magic link) still deployed
+    if (res.password) {
+      // The account exists and the director gets the password every time;
+      // emailed says whether the person has it too.
+      setCreated({ name: full_name, email, password: res.password, emailed: !!res.emailed })
+      setInviteName(''); setInviteEmail(''); setInviteRole('leader')
+    } else {
+      toast(`Invite sent to <b>${email}</b>.`) // the pre-12-Oct function (magic link) still deployed
+    }
     load()
   }
 
@@ -130,6 +136,28 @@ export default function Team() {
           )
         }) : <EmptyState>No one here yet.</EmptyState>}
       </Card>
+
+      <Modal open={!!created} title="Sign-in details" sub={created?.emailed ? 'Emailed to them as well. Keep a copy in case they need it read out.' : "The email couldn't be sent, so pass these on yourself."} saveLabel="Done" onClose={() => setCreated(null)}>
+        {created && (
+          <div className="rounded-xl border-[1.5px] border-line overflow-hidden text-[13px]">
+            {[['Sign in at', window.location.origin + '/'], ['Email', created.email], ['Password', created.password]].map(([k, v], i) => (
+              <div key={k} className={`flex items-center gap-3 px-3.5 py-2.5 ${i ? 'border-t border-line' : ''}`}>
+                <div className="w-20 flex-none font-mono text-[10.5px] uppercase tracking-[.08em] text-muted-label">{k}</div>
+                <div className={`flex-1 min-w-0 break-all ${k === 'Password' ? 'font-mono text-[15px] font-bold tracking-[.06em] text-ink-deep' : 'font-semibold text-ink-deep'}`}>{v}</div>
+              </div>
+            ))}
+          </div>
+        )}
+        {created && (
+          <div className="flex gap-2 mt-3">
+            <BtnSm variant="outline" onClick={async () => {
+              const text = `Sign in at: ${window.location.origin}/\nEmail: ${created.email}\nPassword: ${created.password}`
+              try { await navigator.clipboard.writeText(text); toast('Copied.') } catch { toast("Couldn't copy — select the text instead.") }
+            }}>Copy details</BtnSm>
+          </div>
+        )}
+        <p className="text-[12.5px] text-muted-body mt-3">They can change the password from Profile once they're in.</p>
+      </Modal>
 
       <Modal open={inviteOpen} title="Add someone" sub="They'll get an email with the sign-in link, their email and a password" saveLabel="Add and email them" onClose={() => setInviteOpen(false)} onSave={sendInvite}>
         <Field label="Full name"><TextInput value={inviteName} onChange={(e) => setInviteName(e.target.value)} placeholder="e.g. Amara Chi" /></Field>

@@ -143,9 +143,9 @@ follow-ups, and generate reports.
   password and email it with the sign-in link through the church's SMTP** (org decision,
   12 Oct 2026): the GoTrue magic-link invite kept tripping people up (expired links, wrong
   browser, wrong inbox), so `supabase/templates/invite.html` is no longer what new staff
-  receive. If SMTP is unset or the send fails, the account still exists and the function hands
-  the password back once, and the Team pane shows it in a long toast for the director to pass
-  on. Passwords are 12 look-alike-free characters in three groups, crypto-random. Deploy it (`supabase functions deploy manage-staff`)
+  receive. The director always sees the password too, in a "Sign-in details" box with a
+  copy button, whether or not the email went out (so it can be read out over the phone); if
+  SMTP is unset or the send fails the box says so and the account still exists. Passwords are 12 look-alike-free characters in three groups, crypto-random. Deploy it (`supabase functions deploy manage-staff`)
   for that pane to work; without it, role management still falls back to the manual SQL in
   `schema.sql`'s closing comment. Business rule enforced server-side, not just in the UI: a
   director can never remove or re-role themselves (no exceptions) or another director — only

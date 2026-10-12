@@ -11,7 +11,8 @@
 // settings (SMTP_HOST/PORT/USER/PASS/FROM, shared with the other
 // functions) so the invite email can go out. Without SMTP configured the
 // account is still created and the password is handed back to the
-// director on screen to pass on, so an invite never silently stalls.
+// director on screen to pass on, so an invite never silently stalls. The
+// director sees the password on screen in every case, not only then.
 //
 // Invites create the account with a ready-to-use password and email it
 // with the sign-in link (org decision, 12 Oct 2026). The earlier magic
@@ -177,9 +178,12 @@ Deno.serve(async (req) => {
         console.error("invite email failed:", e);
       }
 
-      // No email went out (SMTP unset or failed): hand the password back so
-      // the director can pass it on themselves. It is returned ONLY then.
-      return emailed ? ok({ emailed: true }) : ok({ emailed: false, password });
+      // The director always gets the password back (org decision, 12 Oct
+      // 2026): they can read it out on the phone, re-send it, or type it in
+      // for someone, whether or not the email went through. The caller is
+      // a verified director who just created this account, so this reveals
+      // nothing they couldn't have set themselves.
+      return ok({ emailed, password });
     }
 
     if (action === "remove" || action === "set_role") {
