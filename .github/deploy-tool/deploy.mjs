@@ -1,7 +1,12 @@
 // CI-only script: calls the official hostinger-hosting-mcp server (run locally
 // on the runner, HTTP transport) to deploy a static-site archive. This mirrors
 // exactly what a human operator does through the Hostinger MCP tool by hand —
-// same tool name, same arguments — just automated for CI.
+// same operations, same arguments — just automated for CI.
+//
+// Since hostinger-api-mcp v2.x the server exposes three meta-tools over HTTP
+// (search / execute / multi-execute) and every real operation, including the
+// custom upload-and-deploy one, is reached through execute({ operation, params }).
+// Operation names are pinned alongside the package version in deploy.yml.
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 
@@ -41,6 +46,15 @@ function extractJson(result) {
 // failing an otherwise-fine deploy. Retrying the same call is safe here:
 // the failures observed happened before any bytes were sent ("Pre-upload
 // request failed"), so nothing has been partially applied server-side.
+// Run one named operation through the server's execute meta-tool and unwrap
+// its JSON result. An isError reply is thrown so withRetry can retry it.
+async function run(operation, params) {
+  const result = await client.callTool({ name: "execute", arguments: { operation, params } });
+  const parsed = extractJson(result);
+  if (result.isError) throw new Error(`${operation}: ${typeof parsed === "string" ? parsed : JSON.stringify(parsed)}`);
+  return parsed;
+}
+
 async function withRetry(label, fn, attempts = 3) {
   for (let i = 1; i <= attempts; i++) {
     try {
@@ -58,32 +72,29 @@ try {
   await client.connect(transport);
 
   console.log(`Deploying ${archivePath} -> ${domain} ...`);
-  const deployResult = await withRetry("Deploy", () =>
-    client.callTool({
-      name: "hosting_deployStaticWebsite",
-      arguments: { domain, archivePath, removeArchive: true },
-    })
+  const parsed = await withRetry("Deploy", () =>
+    run("hosting_deploy-static-website", { domain, archivePath, removeArchive: true })
   );
-  const parsed = extractJson(deployResult);
   console.log("Deploy result:", JSON.stringify(parsed, null, 2));
 
-  if (
-    deployResult.isError ||
-    parsed?.upload?.status !== "success" ||
-    parsed?.deploy?.status !== "success"
-  ) {
+  if (parsed?.upload?.status !== "success" || parsed?.deploy?.status !== "success") {
     console.error("Deploy did not report success.");
     process.exit(1);
   }
 
+  // The cache-clear tool needs the hosting account username as well as the
+  // domain, so look it up rather than hardcoding an account id in the repo.
+  console.log("Resolving hosting account ...");
+  const sites = await withRetry("Website lookup", () => run("hosting_websites_list", { domain }));
+  const username = sites?.data?.[0]?.username;
+  if (!username) {
+    console.error("Could not resolve the hosting username for", domain, JSON.stringify(sites));
+    process.exit(1);
+  }
+
   console.log("Clearing website cache ...");
-  const cacheResult = await withRetry("Cache clear", () =>
-    client.callTool({
-      name: "hosting_clearWebsiteCacheV1",
-      arguments: { domain },
-    })
-  );
-  console.log("Cache clear result:", JSON.stringify(extractJson(cacheResult), null, 2));
+  const cacheResult = await withRetry("Cache clear", () => run("hosting_cache_clear-website", { username, domain }));
+  console.log("Cache clear result:", JSON.stringify(cacheResult, null, 2));
 
   console.log("Deploy succeeded.");
 } catch (err) {
