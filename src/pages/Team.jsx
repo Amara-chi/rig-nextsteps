@@ -10,6 +10,7 @@ import EmptyState from '../components/EmptyState.jsx'
 import { useMe } from '../context/MeContext.jsx'
 import { useAppToast } from '../context/ToastContext.jsx'
 import { supabase } from '../lib/supabaseClient.js'
+import { isSuperAdmin as checkSuperAdmin } from '../config/site.js'
 
 const ROLE_LABEL = { director: 'Admin', leader: 'Leader', support: 'Support' }
 const ROLE_BADGE = { director: 'orange', leader: 'navy', support: 'grey' }
@@ -21,11 +22,6 @@ const STAFF_ERR = {
   not_found: "Couldn't find that person.",
 }
 const staffErrMsg = (code) => STAFF_ERR[code] || 'Something went wrong.'
-
-// Must match manage-staff's SUPER_ADMIN_EMAIL — this only controls whether
-// the controls are OFFERED in the UI; the actual permission is enforced
-// server-side regardless of what this says.
-const SUPER_ADMIN_EMAIL = 'adewale.jody@gmail.com'
 
 export default function Team() {
   const me = useMe()
@@ -54,7 +50,9 @@ export default function Team() {
     return { ok: false, error: code }
   }
 
-  const isSuperAdmin = (me?.email || '').toLowerCase() === SUPER_ADMIN_EMAIL
+  // This only controls whether the controls are OFFERED in the UI; the
+  // actual permission is enforced server-side in manage-staff regardless.
+  const isSuperAdmin = checkSuperAdmin(me)
 
   const setRole = async (id, role) => {
     setSavingRoleId(id)
