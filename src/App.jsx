@@ -74,7 +74,7 @@ export default function App() {
         <div className={BASE_CLASS}>
           <div className="flex min-h-dvh">
             <Sidebar nav={nav} activePane={pane} onNavigate={setActivePane} me={me} onSignOut={signOut} counts={navCounts} />
-            <main className="flex-1 pt-7.5 px-9 pb-22.5 max-mobile:pt-5 max-mobile:px-4 max-mobile:pb-24 max-w-290 w-full">
+            <main className="flex-1 min-w-0 pt-7.5 px-9 pb-22.5 max-mobile:pt-5 max-mobile:px-4 max-mobile:pb-24 max-w-290 w-full">
               {me.role === 'leader' && <ReadonlyBanner />}
 
               <Pane active={pane === 'today'}><Today people={people} openSession={openSession} todaysCheckins={todaysCheckins} /></Pane>
@@ -104,7 +104,7 @@ export default function App() {
                   conversations={messages.conversations}
                   people={support.all}
                   refresh={messages.refresh}
-                  sub="Every WhatsApp conversation with the people on your pages. Open one to read it and reply."
+                  sub="Everyone on your pages, with the church's WhatsApp conversation where there is one. Open one to read it and reply."
                 />
               </Pane>
               {me.role === 'director' && <Pane active={pane === 'team'}><Team /></Pane>}

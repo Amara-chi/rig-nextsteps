@@ -257,7 +257,10 @@ Three staff roles, checked by `public.is_director()` / `is_leader()` / `is_suppo
   outcome is logged a person drops off Follow-Up's lists, so before this pane a reply from
   them landed in the database and was seen by nobody. `v_wa_conversations` is keyed on
   person_id, falling back to phone, so a message from a number not on file is still visible
-  rather than orphaned. Support has the pane too (12 Oct 2026): the view is
+  rather than orphaned. Since 12 Oct 2026 the pane lists EVERYONE on file, like a WhatsApp
+  contact list, with a search box: conversations first by latest activity, then a "Not
+  messaged yet" section by name, so a chat can be started with anyone from one place.
+  Support has the pane too (12 Oct 2026): the view is
   security_invoker, so RLS trims it to support-visible people and `full_name` comes back
   null for that role (no access to `people`); `Messages` and `SupportPersonList` resolve
   the name from `v_support_people` instead. Verified against the local stack as a support
@@ -294,7 +297,8 @@ Three staff roles, checked by `public.is_director()` / `is_leader()` / `is_suppo
 - Tone of copy: warm, confident, never corporate ("You belong here."). British/Nigerian
   spelling. Dates day-month-year. No em dashes in church-facing copy.
 - Everything must work well at 390px wide (most users are on phones); admin uses a bottom
-  nav under the `mobile` breakpoint (760px) and a two-column-to-one collapse under `tablet`
+  nav under the `mobile` breakpoint (760px; it scrolls sideways with the scrollbar hidden and
+  the active item kept in view, because a director's nine items no longer fit across 390px) and a two-column-to-one collapse under `tablet`
   (900px) — both custom breakpoints defined in `theme.css` to match the original app's exact
   cutoffs.
 - Tailwind v4 decimal spacing scale is the default way to hit an exact old-CSS pixel value
@@ -345,6 +349,14 @@ Three staff roles, checked by `public.is_director()` / `is_leader()` / `is_suppo
   before either writes it back) — harmless in dev, and doesn't happen in a production build,
   since StrictMode's extra invocation is stripped from `npm run build` output. Don't chase it
   as an app bug if seen only under `npm run dev`.
+- Real-browser checks: `puppeteer-core` driving the machine's own Edge
+  (`C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe`) against `npm run dev` +
+  the local stack works well for screenshots and overflow checks (compare
+  `document.documentElement.scrollWidth` to `clientWidth`); no browser download needed. Wait
+  for sign-in by watching for "Sign out" in the body text, NOT for the password input to
+  disappear: Profile's change-password fields are always mounted.
+- `<main>` must keep `min-w-0`: without it an unbreakable string (a long URL in a message
+  preview) widens the whole admin column past the viewport, found 12 Oct 2026.
 - Test data created while verifying against the local stack (people/checkins/followups/notes/
   sessions) should be deleted afterward via the REST API with the local `service_role` key —
   don't leave it for the next session to trip over.
