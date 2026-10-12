@@ -1,5 +1,7 @@
-// Shown for leader/support roles — director gets full write access, so
-// never sees this. Old app toggled this via a body.leader/body.support CSS
+// Shown for the leader role only: director has full write access, and
+// support is not read-only (it sends messages and logs outcomes), so the
+// banner was wrong there and was dropped from that view on 12 Oct 2026.
+// Old app toggled this via a body.leader/body.support CSS
 // rule; here it's a plain conditional render in App.jsx.
 export default function ReadonlyBanner() {
   return (

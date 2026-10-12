@@ -75,7 +75,7 @@ export default function App() {
           <div className="flex min-h-dvh">
             <Sidebar nav={nav} activePane={pane} onNavigate={setActivePane} me={me} onSignOut={signOut} counts={navCounts} />
             <main className="flex-1 pt-7.5 px-9 pb-22.5 max-mobile:pt-5 max-mobile:px-4 max-mobile:pb-24 max-w-290 w-full">
-              {me.role !== 'director' && <ReadonlyBanner />}
+              {me.role === 'leader' && <ReadonlyBanner />}
 
               <Pane active={pane === 'today'}><Today people={people} openSession={openSession} todaysCheckins={todaysCheckins} /></Pane>
               <Pane active={pane === 'session'}>
@@ -91,13 +91,21 @@ export default function App() {
                 <Messages conversations={messages.conversations} people={people} refresh={messages.refresh} />
               </Pane>
               <Pane active={pane === 'support-hc'}>
-                <SupportHouseChurch list={support.hc} hadError={support.hadError} refresh={support.refresh} />
+                <SupportHouseChurch list={support.hc} hadError={support.hadError} refresh={support.refresh} conversations={messages.conversations} refreshMessages={messages.refresh} />
               </Pane>
               <Pane active={pane === 'support-followup'}>
-                <SupportFollowUp list={support.followup} hadError={support.hadError} refresh={support.refresh} />
+                <SupportFollowUp list={support.followup} hadError={support.hadError} refresh={support.refresh} conversations={messages.conversations} refreshMessages={messages.refresh} />
               </Pane>
               <Pane active={pane === 'support-membership'}>
-                <SupportMembership list={support.membership} hadError={support.hadError} refresh={support.refresh} />
+                <SupportMembership list={support.membership} hadError={support.hadError} refresh={support.refresh} conversations={messages.conversations} refreshMessages={messages.refresh} />
+              </Pane>
+              <Pane active={pane === 'support-messages'}>
+                <Messages
+                  conversations={messages.conversations}
+                  people={support.all}
+                  refresh={messages.refresh}
+                  sub="Every WhatsApp conversation with the people on your pages. Open one to read it and reply."
+                />
               </Pane>
               {me.role === 'director' && <Pane active={pane === 'team'}><Team /></Pane>}
               <Pane active={pane === 'profile'}><Profile onDataChange={refreshMe} /></Pane>

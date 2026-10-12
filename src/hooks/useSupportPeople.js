@@ -23,6 +23,7 @@ export function useSupportPeople(me) {
   usePolling(load, { enabled: me?.role === 'support' })
 
   return {
+    all: list,
     hc: list.filter((p) => p.is_house_church),
     followup: list.filter((p) => p.is_awaiting_followup || p.is_noshow),
     membership: list.filter((p) => p.is_membership),

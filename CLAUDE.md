@@ -64,8 +64,9 @@ follow-ups, and generate reports.
   `completed` because a Follow-Up person row and a Support one don't carry the same fields),
   `Sidebar`/`BottomNav`/`Pane`, `Toast`, `VideoFallbackModal`.
 - `src/hooks/` — `useAuth`, `useMessages` (the Messages pane's conversation list and the nav's
-  unread badge, polled; not loaded for support, which reaches conversations through its own
-  three pages), `useAppData` (people/session/checkins/session-feed, polled every
+  unread badge, polled, for every role: support gets its own Messages page and a
+  conversation status line on each of its rows since 12 Oct 2026, because before that a
+  reply to a support-sent message was visible to nobody on that side), `useAppData` (people/session/checkins/session-feed, polled every
   10s for non-support roles), `useFollowUp`, `useSupportPeople` (the support role's own
   `v_support_people`-backed data, also polled), `useReports`, `usePolling` (generic
   `setInterval` + `document.hidden` guard), `useToast`.
@@ -238,7 +239,13 @@ Three staff roles, checked by `public.is_director()` / `is_leader()` / `is_suppo
   outcome is logged a person drops off Follow-Up's lists, so before this pane a reply from
   them landed in the database and was seen by nobody. `v_wa_conversations` is keyed on
   person_id, falling back to phone, so a message from a number not on file is still visible
-  rather than orphaned.
+  rather than orphaned. Support has the pane too (12 Oct 2026): the view is
+  security_invoker, so RLS trims it to support-visible people and `full_name` comes back
+  null for that role (no access to `people`); `Messages` and `SupportPersonList` resolve
+  the name from `v_support_people` instead. Verified against the local stack as a support
+  user: hidden people's threads never appear, `wa_mark_read` returns 0 for them.
+- The read-only banner is leader-only. Support is not read-only (it sends and logs
+  outcomes), so showing it there was misleading and it was removed from that view.
 - **Email alerts go through the church's own SMTP**, not Resend (the account already exists for
   `info@rigchurchlagos.org`). One email per conversation that needs attention, not one per
   message: only the message that takes a conversation from nothing-unread to something-unread

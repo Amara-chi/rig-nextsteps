@@ -7,11 +7,14 @@ import { usePolling } from './usePolling.js'
 // lifecycle: a reply from someone whose outcome was logged weeks ago still
 // has to be seen, which is the whole reason this pane exists.
 //
-// Support accounts don't get this pane — they reach conversations through
-// their own three pages — so this doesn't load for them.
+// Loaded for every role, support included (added 12 Oct 2026). The view is
+// security_invoker, so for support the table's own RLS trims it to the
+// people support_visible_person() allows, and full_name comes back null
+// because that role cannot read people. The pages resolve the name from
+// v_support_people instead, which support can read.
 export function useMessages(me) {
   const [conversations, setConversations] = useState([])
-  const enabled = !!me && me.role !== 'support'
+  const enabled = !!me
 
   const load = useCallback(async () => {
     if (!enabled) return

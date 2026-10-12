@@ -25,6 +25,7 @@ export const NAV_SUPPORT = [
   { id: 'support-hc', label: 'House Church', icon: <><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" /><path d="M9 22V12h6v10" /></> },
   { id: 'support-followup', label: 'Follow Up', icon: ICONS.followup },
   { id: 'support-membership', label: 'Membership', icon: ICONS.people },
+  { id: 'support-messages', label: 'Messages', icon: ICONS.messages, cnt: 'messages' },
 ]
 
 export const NAV_TEAM = { id: 'team', label: 'Team', icon: ICONS.team }
