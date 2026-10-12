@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabaseClient.js'
 
-const STATUS_LABEL = { sent: 'Message sent', called: 'Called', texted: 'Texted', door_open: 'Door open' }
+export const STATUS_LABEL = { sent: 'Message sent', called: 'Called', texted: 'Texted', door_open: 'Door open' }
 
 // Not part of useAppData's 10s poll — the old app only loaded this at boot
 // (refreshAll) and re-loaded it manually after specific actions, never on

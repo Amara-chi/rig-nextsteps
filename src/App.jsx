@@ -94,7 +94,7 @@ export default function App() {
                 <SupportHouseChurch list={support.hc} hadError={support.hadError} refresh={support.refresh} conversations={messages.conversations} refreshMessages={messages.refresh} />
               </Pane>
               <Pane active={pane === 'support-followup'}>
-                <SupportFollowUp list={support.followup} hadError={support.hadError} refresh={support.refresh} conversations={messages.conversations} refreshMessages={messages.refresh} />
+                <SupportFollowUp list={support.all} hadError={support.hadError} refresh={support.refresh} />
               </Pane>
               <Pane active={pane === 'support-membership'}>
                 <SupportMembership list={support.membership} hadError={support.hadError} refresh={support.refresh} conversations={messages.conversations} refreshMessages={messages.refresh} />

@@ -50,10 +50,14 @@ follow-ups, and generate reports.
   videos, always visible, not tied to today's session), `People`, `FollowUp` (the 3-tab
   Follow-Up Centre), `Reports` (customizable fields via `app_settings.report_fields`, below,
   plus ad-hoc one-off fields per session via `sessions.custom_fields`), `Team` (director only),
-  and the 3 Support pages `SupportHouseChurch` / `SupportFollowUp` / `SupportMembership` (all
-  three share `src/components/SupportPersonList.jsx` — same `v_support_people` row shape, same
-  notes thread, differing only in which independent boolean filters the list and which badge
-  shows).
+  and the 3 Support pages `SupportHouseChurch` / `SupportFollowUp` / `SupportMembership`.
+  House Church and Membership share `src/components/SupportPersonList.jsx` (same
+  `v_support_people` row shape, same notes thread, differing only in which independent boolean
+  filters the list and which badge shows). `SupportFollowUp` IS the Follow-Up Centre (org
+  decision, 12 Oct 2026: support's follow-up page must look exactly like the director's): it
+  reshapes `v_support_people` rows into the `followups`-shaped rows `FollowUp.jsx` expects
+  and renders that same page, three tabs, message preview and all. `FollowUp` lets director
+  and support act, leader only look; RLS still scopes every support write.
 - `src/components/` — shared UI: `Modal` (the one generic modal, ~12 call sites, each owning
   its own form-field state instead of the old `getElementById(...).value`-at-save-time
   pattern), `Card`/`CardHead`, `Badge`, `Avatar`, `BtnSm`/`Btn`, `NotesThread` (shared by

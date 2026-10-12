@@ -22,9 +22,14 @@ const TABS = [
 
 const linkBtnClass = 'inline-flex items-center gap-1.5 px-4 py-2.25 rounded-[10px] font-bold text-[12.5px] whitespace-nowrap bg-white border-[1.5px] border-line text-ink hover:border-orange hover:text-orange'
 
+// Rendered for director and leader from useFollowUp's rows, and for support
+// from SupportFollowUp's reshaping of v_support_people: the same page for
+// everyone who does follow-up. Leaders only look; director and support act.
+// The buttons being hidden is not the authorisation: the database's own
+// rules decide who may update a followup or send through whatsapp-send.
 export default function FollowUp({ people, attended, awaiting, noshows, STATUS_LABEL, refresh }) {
   const me = useMe()
-  const isDirector = me?.role === 'director'
+  const canAct = me?.role === 'director' || me?.role === 'support'
   const toast = useAppToast()
   const [tab, setTab] = useState('attended')
   const [outcomeState, setOutcomeState] = useState(null) // { kind, id?, personId, title, sub, defaultStatus }
@@ -137,12 +142,12 @@ export default function FollowUp({ people, attended, awaiting, noshows, STATUS_L
                   <div className="mt-1.75 py-2.5 px-3.25 rounded-[4px_13px_13px_13px] bg-cream text-xs text-muted-body max-w-[52ch] border border-line">{msg}</div>
                 </div>
                 <div className="ml-auto flex gap-1.75 flex-none flex-wrap">
-                  {isDirector && (
+                  {canAct && (
                     <BtnSm disabled={sendingId === f.id} onClick={() => sendAttended(f)}>
                       {sendingId === f.id ? 'Sending…' : 'Send on WhatsApp'}
                     </BtnSm>
                   )}
-                  {isDirector && (
+                  {canAct && (
                     <BtnSm variant="outline" onClick={() => setOutcomeState({ kind: 'followup', id: f.id, personId: f.people?.id, title: 'Log follow-up outcome', sub: f.people?.full_name, defaultStatus: 'called' })}>
                       Log outcome
                     </BtnSm>
@@ -164,15 +169,15 @@ export default function FollowUp({ people, attended, awaiting, noshows, STATUS_L
               <Avatar name={f.people?.full_name} />
               <div className="flex-1 min-w-55">
                 <div className="font-extrabold text-[13px] text-ink-deep">
-                  {f.people?.full_name} <Badge variant="navy">{STATUS_LABEL[f.status] || f.status} · {fmtDate((f.updated_at || '').slice(0, 10))}</Badge>
+                  {f.people?.full_name} <Badge variant="navy">{STATUS_LABEL[f.status] || f.status}{f.updated_at ? ` · ${fmtDate(f.updated_at.slice(0, 10))}` : ''}</Badge>
                 </div>
               </div>
               <div className="ml-auto flex gap-1.75 flex-none flex-wrap">
                 <button type="button" onClick={() => setChatPerson({ ...f.people, completed: prog?.steps_done === 4 })} className={linkBtnClass}>Open chat</button>
-                {isDirector && (
+                {canAct && (
                   <BtnSm variant="outline" onClick={() => backToSend(f)}>Back to To send</BtnSm>
                 )}
-                {isDirector && (
+                {canAct && (
                   <BtnSm onClick={() => setOutcomeState({ kind: 'followup', id: f.id, personId: f.people?.id, title: 'Log follow-up outcome', sub: f.people?.full_name, defaultStatus: f.status })}>
                     Log outcome
                   </BtnSm>
@@ -202,12 +207,12 @@ export default function FollowUp({ people, attended, awaiting, noshows, STATUS_L
                 </div>
                 <div className="ml-auto flex gap-1.75 flex-none flex-wrap">
                   <a href={`tel:+${p.phone}`} className={linkBtnClass}>Call</a>
-                  {isDirector && (
+                  {canAct && (
                     <BtnSm variant="outline" disabled={sendingId === p.id} onClick={() => sendNoshow(p, msg)}>
                       {sendingId === p.id ? 'Sending…' : 'Text'}
                     </BtnSm>
                   )}
-                  {isDirector && (
+                  {canAct && (
                     <BtnSm onClick={() => setOutcomeState({ kind: 'noshow', personId: p.id, title: 'Log no-show follow-up', sub: p.full_name, defaultStatus: 'called' })}>
                       Log outcome
                     </BtnSm>
