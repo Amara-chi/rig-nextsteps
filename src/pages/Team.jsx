@@ -75,8 +75,13 @@ export default function Team() {
     const full_name = inviteName.trim()
     if (!email) { toast('Enter an email address.'); return false }
     const res = await callStaffFn({ action: 'invite', email, full_name, role: inviteRole, redirect_to: window.location.origin + '/' })
-    if (!res.ok) { toast("Couldn't send the invite — " + staffErrMsg(res.error)); return false }
-    toast(`Invite sent to <b>${email}</b>.`)
+    if (!res.ok) { toast("Couldn't add them — " + staffErrMsg(res.error)); return false }
+    // The account exists either way. If no email went out (SMTP not set up,
+    // or it failed) the function hands the password back so the director
+    // can pass it on themselves, and it is shown exactly once, here.
+    if (res.emailed) toast(`Done — their sign-in details have been emailed to <b>${email}</b>.`)
+    else if (res.password) toast(`Added, but the email couldn't be sent. Give them this password: <b>${res.password}</b>`, 20000)
+    else toast(`Invite sent to <b>${email}</b>.`) // the pre-12-Oct function (magic link) still deployed
     load()
   }
 
@@ -126,7 +131,7 @@ export default function Team() {
         }) : <EmptyState>No one here yet.</EmptyState>}
       </Card>
 
-      <Modal open={inviteOpen} title="Invite someone" sub="They'll get an email to set up their sign-in" saveLabel="Send invite" onClose={() => setInviteOpen(false)} onSave={sendInvite}>
+      <Modal open={inviteOpen} title="Add someone" sub="They'll get an email with the sign-in link, their email and a password" saveLabel="Add and email them" onClose={() => setInviteOpen(false)} onSave={sendInvite}>
         <Field label="Full name"><TextInput value={inviteName} onChange={(e) => setInviteName(e.target.value)} placeholder="e.g. Amara Chi" /></Field>
         <Field label="Email"><TextInput type="email" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} placeholder="them@example.com" /></Field>
         <Field label="Role">

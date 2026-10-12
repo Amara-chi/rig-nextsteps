@@ -8,11 +8,13 @@ export function useToast() {
   const [visible, setVisible] = useState(false)
   const timerRef = useRef(null)
 
-  const toast = useCallback((message) => {
+  // Optional duration: most toasts are a glance, but one that carries a
+  // password the director has to copy needs to stay up.
+  const toast = useCallback((message, ms = 2600) => {
     setHtml(message)
     setVisible(true)
     clearTimeout(timerRef.current)
-    timerRef.current = setTimeout(() => setVisible(false), 2600)
+    timerRef.current = setTimeout(() => setVisible(false), ms)
   }, [])
 
   return { html, visible, toast }
