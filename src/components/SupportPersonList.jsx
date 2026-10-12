@@ -116,13 +116,13 @@ export default function SupportPersonList({ list, context, hadError, refresh }) 
                   )}
                   {kind === 'log-followup' && (
                     <>
-                      <a href={waLink(p.phone, '')} target="_blank" rel="noopener" className={linkBtnClass}>Open chat</a>
+                      <button type="button" onClick={() => setChatPerson(p)} className={linkBtnClass}>Open chat</button>
                       <BtnSm onClick={() => setOutcomeState({ kind: 'followup', id: p.open_followup_id, personId: p.id, title: 'Log follow-up outcome', sub: p.full_name, defaultStatus: p.open_followup_status })}>Log outcome</BtnSm>
                     </>
                   )}
                   {kind === 'log-noshow' && (
                     <>
-                      <a href={waLink(p.phone, '')} target="_blank" rel="noopener" className={linkBtnClass}>Open chat</a>
+                      <button type="button" onClick={() => setChatPerson(p)} className={linkBtnClass}>Open chat</button>
                       <BtnSm onClick={() => setOutcomeState({ kind: 'noshow', personId: p.id, title: 'Log no-show follow-up', sub: p.full_name, defaultStatus: 'called' })}>Log outcome</BtnSm>
                     </>
                   )}
