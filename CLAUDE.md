@@ -119,8 +119,16 @@ follow-ups, and generate reports.
 - `supabase/functions/email-report` — optional Edge Function: emails weekly report via Resend.
   Field selection and order matches `app_settings.report_fields` (see below) — same report,
   same customization, whether viewed on screen or emailed.
-- `supabase/functions/send-followups` — optional Edge Function: auto-sends WhatsApp follow-ups
-  via Meta WhatsApp Cloud API (requires approved template `next_steps_followup`)
+- `supabase/functions/send-followups` — the Sunday 4pm message (org decision, 12 Oct 2026):
+  sends the attended template to everyone who checked in THAT DAY (Lagos date) and is still
+  pending, records each in `whatsapp_messages` like `whatsapp-send` does, marks the followup
+  sent. Idempotent (someone already sent today's template is marked sent and skipped), leaves
+  anyone who just completed all 4 for a person unless `WHATSAPP_TEMPLATE_COMPLETED` exists,
+  never touches older pending rows. Accepts only the service role key (or `CRON_SECRET` via
+  `x-cron-secret`) because the anon key is public and this messages newcomers. `?dry=1`
+  previews. Scheduled by `supabase/schedule-sunday-followups.sql` (pg_cron + Vault, 0 15 * * 0
+  = 16:00 Lagos, no DST). The wording lives in `_shared/messages.ts`, a deliberate copy of
+  `src/config/site.js` because a function cannot import from `src/`: keep the two identical.
 - `supabase/functions/_shared/` — `email.ts` (the one email shell: banner, arch, CTA, plus
   `quote`/`section` blocks) and `mailer.ts` (SMTP send). Two audiences, deliberately separate:
   `NOTIFY_EMAILS` is operational (someone is waiting on a reply now) and `DIGEST_EMAILS` is
@@ -379,7 +387,6 @@ Three staff roles, checked by `public.is_director()` / `is_leader()` / `is_suppo
 
 ## Roadmap candidates (discussed, not committed)
 - Note tags (prayer / action / for HC leader) + filtered overseer view
-- Automated WhatsApp via Cloud API (function exists; needs Meta setup)
 - Auto-email weekly report (function exists; needs Resend setup)
 - Gated video catch-up for people who miss a Sunday (admin-unlocked only)
 - Add TypeScript on top of the React port (`supabase gen types typescript`), now that the port

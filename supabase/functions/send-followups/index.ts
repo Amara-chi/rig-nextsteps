@@ -1,82 +1,147 @@
 // ============================================================
-// OPTIONAL ADD-ON · send-followups
-// Sends the pending follow-up messages automatically through
-// the official WhatsApp Cloud API (Meta), then marks them sent.
-// Run it on a schedule — e.g. every Sunday 6pm Lagos time —
-// so nobody has to tap through the queue by hand.
+// send-followups · the Sunday 4pm message
+// Sends the follow-up message to everyone who came to Next Steps TODAY
+// and has not been messaged yet, from the church's WhatsApp number, and
+// records each one in whatsapp_messages so the chat shows it. Meant to
+// run on a schedule every Sunday at 16:00 Lagos (org decision, 12 Oct
+// 2026); nobody has to tap through the To send queue by hand any more,
+// though the queue still works for anything this run leaves behind.
 //
-// Requirements (see PHASE2-GUIDE.md):
-//   - Meta developer account with WhatsApp Cloud API enabled
-//   - An APPROVED message template named "next_steps_followup"
-//     with ONE variable: {{1}} = first name. Its body must stay word for word
-//     identical to MSG_ATTENDED in src/config/site.js, so the one-tap send and
-//     this scheduled send read as the same church. Sending a different number
-//     of parameters than the approved template declares fails the whole send.
-//     (business-initiated WhatsApp messages must use templates)
-// Secrets to set in Supabase > Edge Functions > Secrets:
-//   WHATSAPP_TOKEN     - permanent system-user access token
-//   WHATSAPP_PHONE_ID  - the sender phone number ID
-//   WHATSAPP_TEMPLATE  - optional, defaults to "next_steps_followup"
+// What it will NOT do:
+//   - message anyone who did not check in today (Lagos date). Older
+//     pending rows stay in To send for a person to decide about.
+//   - message the same person twice. A person already sent today's
+//     template (by this run or by a staff member tapping Send) is marked
+//     sent and skipped, so a second run, or a retry, is harmless.
+//   - send the completion message unless its own approved template
+//     exists (WHATSAPP_TEMPLATE_COMPLETED). Someone who has just finished
+//     all four steps gets different words, and without that template
+//     they stay in To send for a human rather than getting the wrong ones.
+//
+// Deploy with JWT verification ON (the default):
+//   supabase functions deploy send-followups
+// and call it with the service role key as the bearer token, which is
+// what supabase/schedule-sunday-followups.sql sets up. The anon key is
+// public and is NOT accepted: this function messages newcomers, so only
+// the scheduler (or a director using the service key) may trigger it.
+// CRON_SECRET is an optional second door for schedulers that cannot hold
+// the service key: send it as the x-cron-secret header.
+//
+// GET or POST. ?dry=1 reports who would be messaged without sending.
+//
+// Secrets (same as whatsapp-send): WHATSAPP_TOKEN, WHATSAPP_PHONE_ID,
+// WHATSAPP_TEMPLATE (optional, defaults to next_steps_followup),
+// WHATSAPP_TEMPLATE_COMPLETED (optional), CRON_SECRET (optional).
 // ============================================================
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { fillMsg, MSG_ATTENDED, MSG_COMPLETED } from "../_shared/messages.ts";
 
-Deno.serve(async (_req) => {
-  const admin = createClient(
-    Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-  );
+const json = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 
-  // Only auto-send fresh follow-ups (last 48h) still pending.
-  const since = new Date(Date.now() - 48 * 3600 * 1000).toISOString();
+// Today's date in Lagos, as YYYY-MM-DD. Lagos has no daylight saving, so
+// "today" is simply UTC+1 and a 16:00 run never straddles midnight.
+const lagosToday = () => new Date(Date.now() + 3600 * 1000).toISOString().slice(0, 10);
+
+Deno.serve(async (req) => {
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const bearer = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
+  const cronSecret = Deno.env.get("CRON_SECRET");
+  const authorised = bearer === serviceKey ||
+    (!!cronSecret && req.headers.get("x-cron-secret") === cronSecret);
+  if (!authorised) return json({ ok: false, error: "not allowed" }, 403);
+
+  const dry = new URL(req.url).searchParams.get("dry") === "1";
+  const admin = createClient(Deno.env.get("SUPABASE_URL")!, serviceKey);
+  const today = lagosToday();
+
+  // Everyone who checked in today and still has their follow-up pending.
   const { data: pending, error } = await admin
     .from("followups")
-    .select("id, people(full_name, phone)")
+    .select("id, person_id, checkins!inner(checkin_date, step), people!inner(id, full_name, phone)")
     .eq("type", "attended").eq("status", "pending")
-    .gte("created_at", since)
-    .limit(100);
+    .eq("checkins.checkin_date", today)
+    .limit(200);
   if (error) return json({ ok: false, error: error.message }, 500);
 
-  const token = Deno.env.get("WHATSAPP_TOKEN")!;
-  const phoneId = Deno.env.get("WHATSAPP_PHONE_ID")!;
-  const template = Deno.env.get("WHATSAPP_TEMPLATE") ?? "next_steps_followup";
-  let sent = 0, failed = 0;
+  const token = Deno.env.get("WHATSAPP_TOKEN");
+  const phoneId = Deno.env.get("WHATSAPP_PHONE_ID");
+  const attendedTemplate = Deno.env.get("WHATSAPP_TEMPLATE") ?? "next_steps_followup";
+  const completedTemplate = Deno.env.get("WHATSAPP_TEMPLATE_COMPLETED") || null;
+  if (!dry && (!token || !phoneId)) {
+    return json({ ok: false, error: "WHATSAPP_TOKEN / WHATSAPP_PHONE_ID not set" }, 500);
+  }
+
+  const report = { date: today, dry, pending: (pending ?? []).length, sent: 0, already: 0, skipped: 0, failed: 0, would_send: [] as string[], left_for_a_person: [] as string[] };
 
   for (const f of pending ?? []) {
-    const first = (f.people?.full_name ?? "").split(" ")[0];
-    try {
-      const res = await fetch(`https://graph.facebook.com/v21.0/${phoneId}/messages`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}`, "content-type": "application/json" },
-        body: JSON.stringify({
-          messaging_product: "whatsapp",
-          to: f.people?.phone,
-          type: "template",
-          template: {
-            name: template,
-            language: { code: "en" },
-            components: [{
-              type: "body",
-              parameters: [
-                { type: "text", text: first },
-              ],
-            }],
-          },
-        }),
-      });
-      if (!res.ok) throw new Error(await res.text());
-      await admin.from("followups")
-        .update({ status: "sent", updated_at: new Date().toISOString() })
-        .eq("id", f.id);
-      sent++;
-    } catch (_e) {
-      failed++; // stays pending; the director sees it in the app
-    }
-  }
-  return json({ ok: true, sent, failed, pending: (pending ?? []).length });
-});
+    const person = f.people as unknown as { id: string; full_name: string; phone: string };
+    const first = (person.full_name ?? "").split(" ")[0];
+    if (!person.phone) { report.skipped++; continue; }
 
-function json(body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), {
-    status, headers: { "content-type": "application/json" },
-  });
-}
+    // Finished all four today? Then the completion words, if we have them.
+    const { data: steps } = await admin.from("checkins").select("step").eq("person_id", person.id);
+    const stepsDone = new Set((steps ?? []).map((s) => s.step)).size;
+    const completed = stepsDone >= 4;
+    const template = completed ? completedTemplate : attendedTemplate;
+    if (!template) {
+      // Nothing approved to send; a person decides from the To send queue.
+      report.left_for_a_person.push(person.full_name);
+      continue;
+    }
+    const body = fillMsg(completed ? MSG_COMPLETED : MSG_ATTENDED, first);
+
+    // Already messaged today (a staff member tapped Send, or this ran
+    // before and the status update didn't land)? Mark sent, don't resend.
+    const { data: dup } = await admin
+      .from("whatsapp_messages").select("id")
+      .eq("person_id", person.id).eq("direction", "out").eq("template_name", template)
+      .gte("created_at", `${today}T00:00:00+01:00`).limit(1);
+    if (dup && dup.length > 0) {
+      if (!dry) await admin.from("followups").update({ status: "sent", updated_at: new Date().toISOString() }).eq("id", f.id);
+      report.already++;
+      continue;
+    }
+
+    if (dry) { report.would_send.push(person.full_name); continue; }
+
+    const res = await fetch(`https://graph.facebook.com/v21.0/${phoneId}/messages`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "content-type": "application/json" },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        to: person.phone,
+        type: "template",
+        template: {
+          name: template,
+          language: { code: "en" },
+          components: [{ type: "body", parameters: [{ type: "text", text: first }] }],
+        },
+      }),
+    });
+    const result = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      // Recorded as a failed row, same as whatsapp-send, so the chat shows
+      // that it never arrived; the followup stays pending for a person.
+      await admin.from("whatsapp_messages").insert({
+        person_id: person.id, phone: person.phone, direction: "out",
+        body, template_name: template, status: "failed",
+        error: result?.error?.message ?? `HTTP ${res.status}`,
+      });
+      report.failed++;
+      continue;
+    }
+
+    await admin.from("whatsapp_messages").insert({
+      person_id: person.id, phone: person.phone, direction: "out",
+      wa_message_id: result?.messages?.[0]?.id ?? null,
+      body, template_name: template, status: "sent",
+    });
+    await admin.from("followups").update({ status: "sent", updated_at: new Date().toISOString() }).eq("id", f.id);
+    report.sent++;
+  }
+
+  console.log("send-followups:", JSON.stringify(report));
+  return json({ ok: true, ...report });
+});
