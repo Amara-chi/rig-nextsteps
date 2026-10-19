@@ -43,12 +43,27 @@ const json = (body: unknown, status = 200) =>
 // "today" is simply UTC+1 and a 16:00 run never straddles midnight.
 const lagosToday = () => new Date(Date.now() + 3600 * 1000).toISOString().slice(0, 10);
 
+// Is this bearer a service-level key? A string compare against the env var
+// is not enough on its own: a project that has opted into Supabase's newer
+// API keys gets the sb_secret_ form injected as SUPABASE_SERVICE_ROLE_KEY,
+// while the scheduler has to send the legacy JWT (the gateway's JWT check
+// rejects anything else). So after the cheap compare, ask Auth's admin
+// endpoint, which only a service-level credential can open.
+async function isServiceKey(bearer: string, serviceKey: string) {
+  if (!bearer) return false;
+  if (bearer === serviceKey) return true;
+  const r = await fetch(`${Deno.env.get("SUPABASE_URL")}/auth/v1/admin/users?per_page=1`, {
+    headers: { apikey: bearer, Authorization: `Bearer ${bearer}` },
+  });
+  return r.ok;
+}
+
 Deno.serve(async (req) => {
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const bearer = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
   const cronSecret = Deno.env.get("CRON_SECRET");
-  const authorised = bearer === serviceKey ||
-    (!!cronSecret && req.headers.get("x-cron-secret") === cronSecret);
+  const authorised = (!!cronSecret && req.headers.get("x-cron-secret") === cronSecret) ||
+    await isServiceKey(bearer, serviceKey);
   if (!authorised) return json({ ok: false, error: "not allowed" }, 403);
 
   const dry = new URL(req.url).searchParams.get("dry") === "1";
