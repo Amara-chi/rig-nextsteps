@@ -1,0 +1,38 @@
+name: Keep Supabase awake
+
+# Supabase pauses a free-tier project after 7 days without API activity.
+# The app's traffic is bursty (Sunday check-ins, staff polling while signed in),
+# so a quiet week can cross that line and the QR check-in would then fail on
+# the next Sunday until someone restores the project by hand.
+#
+# This pings the one read-only RPC the anon key may call, with a phone number
+# that matches nobody, so it creates no data and reads no personal data. It is
+# exactly the request the check-in form makes before someone types their name.
+# Twice a week keeps the gap well under 7 days. Run it by hand from the Actions
+# tab to check the key still works.
+#
+# Note: GitHub switches off scheduled workflows in a repo that has had no
+# commits for 60 days. If that happens, re-enable it from the Actions tab.
+
+on:
+  schedule:
+    - cron: '0 6 * * 3,6'   # Wednesday and Saturday, 06:00 UTC (07:00 Lagos)
+  workflow_dispatch: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call lookup_person with a phone that matches nobody
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          status=$(curl -sS -o /tmp/body -w '%{http_code}' \
+            -X POST "$SUPABASE_URL/rest/v1/rpc/lookup_person" \
+            -H "apikey: $SUPABASE_ANON_KEY" \
+            -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
+            -H "Content-Type: application/json" \
+            -d '{"p_phone":"0000000000"}')
+          echo "HTTP $status: $(cat /tmp/body)"
+          test "$status" = "200"

@@ -6,6 +6,17 @@ Visitors scan a QR code on Sundays and check in on their own phones (no login). 
 to a dashboard to run sessions, track each person's journey through 4 steps, send WhatsApp
 follow-ups, and generate reports.
 
+Since the redesign (29 Oct 2026) the admin app has three areas, each a sidebar group:
+- **Next Steps**: Check-in, Videos, People, Reports, and **Messaging** (the automatic WhatsApp
+  line only: what the church number sent, its delivery status, and replies).
+- **Follow Up**: the human calls. Its own **Contacts** (welcome cards, group lists like Law
+  school, and people Next Steps hands over), **Outcomes** (full create/edit/delete),
+  Membership and House Church, plus a dashboard. Next Steps and Follow Up are different
+  teams; people pass from one to the other.
+- **Bible Study**: Tuesday teaching written up by series, with an admin Upload page.
+The design was worked out on a claude.ai Design canvas ("Bible Study Tab"); `Shell.dc.html`
+there is the reference for the sidebar and Follow Up pages, `TodayN.dc.html` for Today.
+
 ## Architecture
 - **React + Vite + Tailwind CSS v4.** Migrated from a static no-build HTML/CSS/JS app (Aug
   2026) at the user's explicit request, as a faithful 1:1 port — same design, same behaviour,
@@ -41,34 +52,37 @@ follow-ups, and generate reports.
   `src/`.
 - `src/main-admin.jsx`, `src/main-checkin.jsx` — the two entry points, each mounting its own
   root component in `<StrictMode>`.
-- `src/App.jsx` — admin shell: auth gate, sidebar/bottom-nav, pane-switch state, wires the
-  shared data hooks to each pane.
+- `src/App.jsx` — admin shell: auth gate, grouped sidebar (a hamburger drawer on phones —
+  the user explicitly rejected a phone bottom bar, don't bring one back), pane-switch state,
+  wires the shared data hooks to each pane. `src/nav.jsx` defines the three groups and which
+  role sees which page (`navFor(role)`).
 - `src/checkin/CheckinApp.jsx` — the visitor check-in form, one self-contained component (own
   screen-by-screen state, offline queue via localStorage, kiosk mode via `?kiosk=1`).
-- `src/pages/` — one file per admin pane: `Today`, `SessionPane` (Check-in — QR + live
-  arrivals, renamed from "Registration" 3 Aug 2026), `VideosPage` (all 4 steps' teaching
-  videos, always visible, not tied to today's session), `People`, `FollowUp` (the 3-tab
-  Follow-Up Centre), `Reports` (customizable fields via `app_settings.report_fields`, below,
-  plus ad-hoc one-off fields per session via `sessions.custom_fields`), `Team` (director only),
-  and the 3 Support pages `SupportHouseChurch` / `SupportFollowUp` / `SupportMembership` (all
-  three share `src/components/SupportPersonList.jsx` — same `v_support_people` row shape, same
-  notes thread, differing only in which independent boolean filters the list and which badge
-  shows).
+- `src/pages/` — one file per admin pane. Next Steps: `Today` (nested rings, soft bars,
+  "Needs you"; director/leader only), `SessionPane` (Check-in — QR + live arrivals),
+  `VideosPage`, `People` (Next Steps people only: welcome-card contacts with no steps stay in
+  Contacts), `Reports` (customizable fields via `app_settings.report_fields`, plus ad-hoc
+  fields per session via `sessions.custom_fields`), `Messaging` (delivery log + replies +
+  the three templates; replaced the old Follow-Up Centre and Messages panes). Follow Up:
+  `FollowUpDashboard`, `Contacts`, `Outcomes`, `Membership`, `HouseChurch`. Bible Study:
+  `BibleStudy` (series, then sessions, then one session), `BibleUpload` (director). `Team`
+  (director only), `Profile`.
 - `src/components/` — shared UI: `Modal` (the one generic modal, ~12 call sites, each owning
   its own form-field state instead of the old `getElementById(...).value`-at-save-time
-  pattern), `Card`/`CardHead`, `Badge`, `Avatar`, `BtnSm`/`Btn`, `NotesThread` (shared by
-  People's person-detail view and the Support pages — `showLabel`/`className` props cover the
-  two contexts' small markup differences), `OutcomeModal` (shared by Follow-Up Centre and
-  Support's Follow Up page), `ChatPanel` (the in-app WhatsApp conversation, shared by
-  Follow-Up's "Open chat" and the Support pages' "WhatsApp" button; the caller passes
-  `completed` because a Follow-Up person row and a Support one don't carry the same fields),
-  `Sidebar`/`BottomNav`/`Pane`, `Toast`, `VideoFallbackModal`.
-- `src/hooks/` — `useAuth`, `useMessages` (the Messages pane's conversation list and the nav's
-  unread badge, polled; not loaded for support, which reaches conversations through its own
-  three pages), `useAppData` (people/session/checkins/session-feed, polled every
-  10s for non-support roles), `useFollowUp`, `useSupportPeople` (the support role's own
-  `v_support_people`-backed data, also polled), `useReports`, `usePolling` (generic
-  `setInterval` + `document.hidden` guard), `useToast`.
+  pattern), `Dialog` (the wider dialog with its own footer), `Card`/`CardHead`, `Badge`,
+  `Avatar`, `BtnSm`/`Btn`, `NotesThread` (People's person view and the contact panel),
+  `followup.jsx` (every Follow Up building block: `ContactPanel`, `OutcomeDialog` for log
+  and edit, `DeleteOutcomeDialog`, `ContactFormDialog`, badges, `Stat`, `Chips`),
+  `useContactDialogs.jsx` (one set of those dialogs per Follow Up page), `ImportContacts`
+  (CSV import shaped around the church's follow-up sheet and its Call feedbacks sheet),
+  `ChatPanel` (the in-app WhatsApp conversation), `Sidebar` (+ `MobileTopBar`), `Pane`,
+  `Toast`, `VideoFallbackModal`.
+- `src/hooks/` — `useAuth`, `useAppData` (people/session/session-feed, polled every 10s for
+  non-support roles), `useFollowUpData` (`v_contacts`, `v_outcomes`, `staff_names()`; every
+  role, polled), `useMessaging` (outbound/inbound WhatsApp, queued follow-ups, conversations;
+  not for support), `useBibleStudy`, `useTodayData` (check-in dates and follow-ups behind
+  Today's charts), `useReports`, `usePolling` (generic `setInterval` + `document.hidden`
+  guard), `useToast`.
 - `src/lib/` — `supabaseClient.js` (reads the `VITE_*` env vars), `phone.js` (`normPhoneJS`,
   kept in sync with the SQL `norm_phone()` function), `format.js`, `video.js`
   (`toEmbed`/`isDirectVideo` for the Videos pane's YouTube/Vimeo/direct-file players), `csv.js`,
@@ -98,7 +112,9 @@ follow-ups, and generate reports.
 - `supabase/migrations/` — same content split for `supabase db push` workflows
 - `supabase/import-history.sql` — one-time historical data load (27 people, Mar–Jul 2026);
   idempotent; run AFTER the schema
-- `supabase/upgrade-v3.sql` through `upgrade-v14.sql` — only for databases created from older
+- `supabase/seed-bible-study.sql` — optional, idempotent: the Seven Churches series (8 sessions,
+  Jul to Sep 2026) as written up on the design canvas. Run after v15.
+- `supabase/upgrade-v3.sql` through `upgrade-v15.sql` — only for databases created from older
   schema versions; NOT needed on fresh installs
 - `supabase/templates/` — the branded auth emails GoTrue sends: `reset-password.html`
   (forgot-password link) and `invite.html` (new staff member's first sign in). Same shell as
@@ -167,8 +183,15 @@ follow-ups, and generate reports.
 - House church PLACEMENT belongs to the overseer; the app only records interest
   (`hc_interest`) and eligibility.
 - Follow-up: contact within 24h of attendance; no-shows get Monday call → text → door open,
-  never chased. Outcomes are logged after the fact (followups.outcome) and mirrored as
-  person_notes.
+  never chased. Outcomes are logged after the fact in `public.outcomes` (one row per call,
+  credited to whoever made it). Triggers keep the rest in step: logging one closes the
+  person's open follow-up and writes the matching person_note; editing it rewrites both;
+  deleting it removes the note and reopens the follow-up. `followups.outcome` is still
+  written (other code and the Monday digest read it) but `outcomes` is the record.
+- Follow Up's contacts are rows in the SAME `people` table, with `source` ('next_steps',
+  'welcome_card', 'group', 'referral'), so a welcome-card visitor who later scans the QR code
+  stays one person. `phone` is nullable for them (a card may only have an email); a check
+  constraint still requires phone or email.
 
 ## Security model (RLS — enforced in the database, never trust the client)
 Three staff roles, checked by `public.is_director()` / `is_leader()` / `is_support()`:
@@ -178,9 +201,17 @@ Three staff roles, checked by `public.is_director()` / `is_leader()` / `is_suppo
 - **leader** (read-only): sees everyone, same as director, but cannot write to
   people/sessions/checkins/followups. Can add a note on anyone (`person_notes` INSERT, any
   staff, `author_id = auth.uid()` enforced) and edit/delete only their own notes.
-- **support** (narrow, non-admin): sees ONLY people matching `public.support_visible_person()`
-  — house church interest, the post-4-step membership pipeline, or an open follow-up (a
-  pending message, one sent with no outcome yet, or a no-show). No direct table access to
+- **support** (shown in the UI as **Follow Up**; technical name unchanged): sees ONLY people
+  matching `public.support_visible_person()` — house church interest, the post-4-step
+  membership pipeline, an open follow-up (a pending message, one sent with no outcome yet, or
+  a no-show), and since v15 any contact not from Next Steps, anyone assigned a caller, and
+  anyone handed over from a reply. Its whole UI is the Follow Up group. It reads through
+  `v_contacts` and `v_outcomes` (not security_invoker; the WHERE clause is the gate), writes
+  contacts only through `add_contact()`, `update_contact()` and `take_contact()` (security
+  definer, re-checking visibility), and may insert outcomes as itself and edit/delete only the
+  outcomes it logged (`outcomes` RLS). Import, assigning callers, recording membership and
+  house church placement are director-only. The older notes below on `v_support_people` still
+  hold for the Edge Functions, which read it; the UI no longer does. No direct table access to
   `people` or `checkins` at all (row-filtering alone isn't enough — a raw `people` query would
   still return every column, not just the few support needs) — the frontend reads instead
   through `v_support_people`, a view built to expose only name/phone/email/milestone-reason,
@@ -201,9 +232,9 @@ Three staff roles, checked by `public.is_director()` / `is_leader()` / `is_suppo
   digit count and passes the raw string to `lookup_person`/`check_in`, which normalise
   server-side. `normPhoneJS()` is only used admin-side, for editing a person's phone number.)
 - One check-in per person per day: `unique (person_id, checkin_date)`.
-- The no-show rule (1-3 steps done, not seen since last Sunday) is duplicated in both
-  `support_visible_person()` (SQL) and the Follow-Up Centre's no-show list
-  (`src/hooks/useFollowUp.js`) — keep them in sync if either changes.
+- The no-show rule (1-3 steps done, not seen since last Sunday) lives in SQL in three places:
+  `support_visible_person()`, `v_support_people` (kept for the Edge Functions) and
+  `v_contacts`' reason/waiting columns — keep them in sync if it changes.
 
 ## WhatsApp (Cloud API)
 - **Everything to a newcomer goes from the church's own number**, not from whoever tapped the
@@ -234,7 +265,10 @@ Three staff roles, checked by `public.is_director()` / `is_leader()` / `is_suppo
   considered and rejected, because it lets two people answer the same newcomer without either
   realising. Staff have no UPDATE on the table, so `ChatPanel` clears it through the
   `wa_mark_read()` RPC, which re-checks visibility itself rather than trusting the caller.
-- **The Messages pane exists because conversations outlive the follow-up lifecycle.** Once an
+- **Messaging's Replies tab exists because conversations outlive the follow-up lifecycle.**
+  (It was the Messages pane until the 29 Oct 2026 redesign.) A reply that needs a person is
+  passed to Follow Up with "Pass to Follow Up" (`people.handed_over_at`), which puts them in
+  Contacts as waiting. Once an
   outcome is logged a person drops off Follow-Up's lists, so before this pane a reply from
   them landed in the database and was seen by nobody. `v_wa_conversations` is keyed on
   person_id, falling back to phone, so a message from a number not on file is still visible
@@ -265,11 +299,13 @@ Three staff roles, checked by `public.is_director()` / `is_leader()` / `is_suppo
   (`bg-orange`, `text-ink-deep`, etc.), never a hardcoded hex.
 - Fonts: Archivo (display 800/900, tight tracking) + IBM Plex Mono for labels/data.
 - Signature motif: the arch shape (`rounded-arch`, `border-radius: 999px 999px 12px 12px`)
-  from the logo — used for step markers, bars, the QR centre.
+  from the logo — reserved for the four Next Steps steps (step markers, the "all four done"
+  pips, the QR centre). The user asked for it NOT to be reused for anything else (numbered
+  lists, Follow Up icons, date tiles): use circles or rounded squares there instead.
 - Tone of copy: warm, confident, never corporate ("You belong here."). British/Nigerian
   spelling. Dates day-month-year. No em dashes in church-facing copy.
-- Everything must work well at 390px wide (most users are on phones); admin uses a bottom
-  nav under the `mobile` breakpoint (760px) and a two-column-to-one collapse under `tablet`
+- Everything must work well at 390px wide (most users are on phones); admin uses a top bar
+  with a hamburger that opens the sidebar as a drawer under the `mobile` breakpoint (760px) and a two-column-to-one collapse under `tablet`
   (900px) — both custom breakpoints defined in `theme.css` to match the original app's exact
   cutoffs.
 - Tailwind v4 decimal spacing scale is the default way to hit an exact old-CSS pixel value
@@ -333,6 +369,13 @@ Three staff roles, checked by `public.is_director()` / `is_leader()` / `is_suppo
   deploy.mjs` over the Hostinger MCP server (installed and started as earlier steps in the
   same job). The Hostinger MCP calls are wrapped in a retry (3 attempts, backoff) for
   transient network failures.
+- `keepalive.yml` (Wednesday and Saturday, plus manual dispatch): pings the anon-callable
+  `lookup_person` RPC with a phone that matches nobody, so the hosted Supabase project never
+  goes 7 days without API activity (the free tier auto-pauses after that, which would break the
+  Sunday QR check-in until someone restored it by hand). Read-only, creates nothing. Upgrading
+  the project to Pro is the only way to switch auto-pausing off outright; this is the free
+  alternative. GitHub disables scheduled workflows after 60 days with no commits, so re-enable
+  it from the Actions tab if the repo goes quiet.
 - **Retired by the migration, don't reintroduce:** the old `config.js?v=__BUILD_ID__`
   cache-busting `sed` hack. Vite's content-hashed asset filenames (`assets/index-<hash>.js`)
   are a stronger, automatic version of the same idea — a real code change always produces a

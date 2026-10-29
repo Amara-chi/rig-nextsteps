@@ -67,3 +67,61 @@ export const stepOf = (n) => STEPS[n - 1] || { title: '?', video: '' }
 export const MSG_ATTENDED = 'Hi [Name], this is Rig Church Lagos. We are glad you joined us at Next Steps. We really hope you enjoyed your time with us, and we would love to see you again soon. Have a wonderful week!'
 export const MSG_COMPLETED = "[Name], congratulations on completing Next Steps! We're celebrating you. Someone from leadership will be in touch about what comes next."
 export const MSG_NOSHOW = "Hi [Name], it's the Next Steps team at RIG Church. Just wanted to check in and see how you're doing — we missed you this Sunday. No pressure, just wanted to connect."
+
+// ---------- Redesign (29 Oct 2026): roles, outcomes, messaging, contacts ----------
+
+// The technical role names stay as they are in the database ('director',
+// 'leader', 'support'); this is only what people see. 'support' is the
+// Follow Up team.
+export const ROLE_LABELS = { director: 'Admin', leader: 'Leadership', support: 'Follow Up' }
+const ROLE_SUBS = {
+  director: 'Admin · full access',
+  leader: 'Leadership · read-only',
+  support: 'Follow Up · calls and welcome cards',
+}
+export const roleLabel = (role, long = false) => (long ? ROLE_SUBS[role] : ROLE_LABELS[role]) || role || ''
+
+// What a caller did, as stored in outcomes.action (same four values the
+// old outcome modal used, so history before and after reads the same).
+export const OUTCOME_ACTIONS = [
+  { id: 'called', label: 'Called' },
+  { id: 'sent', label: 'Sent a message (WhatsApp/SMS)' },
+  { id: 'texted', label: 'Texted after no answer' },
+  { id: 'door_open', label: 'No response, door open' },
+]
+export const outcomeLabel = (id) => ({ called: 'Called', sent: 'Sent a message', texted: 'Texted after no answer', door_open: 'No response, door open' }[id] || id)
+
+// Why someone is in Follow Up's care, from v_contacts.reason.
+export const CONTACT_REASONS = {
+  failed: { label: 'Message failed', variant: 'orange' },
+  reply: { label: 'From a reply', variant: 'green' },
+  noshow: { label: 'Missed a Sunday', variant: 'grey' },
+  completed: { label: 'Finished all 4', variant: 'navy' },
+  card: { label: 'New visitor', variant: 'green' },
+  group: { label: 'Group list', variant: 'grey' },
+  attended: { label: 'Just attended', variant: 'grey' },
+  hc: { label: 'House church', variant: 'grey' },
+  member: { label: 'Member', variant: 'green' },
+}
+export const CONTACT_SOURCES = {
+  next_steps: { label: 'Next Steps', variant: 'orange' },
+  welcome_card: { label: 'Welcome card', variant: 'navy' },
+  group: { label: 'Group list', variant: 'grey' },
+  referral: { label: 'Referred', variant: 'grey' },
+}
+
+// The three automatic messages, as Messaging shows them. `approved` mirrors
+// what Meta has approved: flip it to true once WHATSAPP_TEMPLATE_COMPLETED /
+// WHATSAPP_TEMPLATE_NOSHOW are set for the whatsapp-send function. It only
+// changes what the page says; the function refuses unapproved templates
+// regardless.
+export const MESSAGE_TEMPLATES = [
+  { key: 'attended', name: 'After a session', when: 'Within 24 hours of a Sunday check-in, to everyone who attended.', text: MSG_ATTENDED, approved: true },
+  { key: 'completed', name: 'Finished all 4', when: 'The Sunday someone completes their fourth step.', text: MSG_COMPLETED, approved: false },
+  { key: 'noshow', name: 'Missed a Sunday', when: 'Monday morning, to anyone with 1 to 3 steps done who missed the Sunday before.', text: MSG_NOSHOW, approved: false },
+]
+// Which of the three a sent message was, from its stored template name.
+export const templateKeyOf = (name) => (/noshow|missed/i.test(name || '') ? 'noshow' : /complete/i.test(name || '') ? 'completed' : 'attended')
+
+export const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+export const AGE_RANGES = ['Under 20', '20 to 30', '30 to 40', '40 to 50', '50 and over']

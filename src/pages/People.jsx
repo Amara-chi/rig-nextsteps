@@ -180,8 +180,12 @@ export default function People({ people, onDataChange }) {
   const q = search.toLowerCase()
   const qDigits = q.replace(/\D/g, '')
   const qPhone = normPhoneJS(q)
-  const rows = people.filter((p) => !q || p.full_name.toLowerCase().includes(q) ||
-    (qDigits && ((p.phone || '').includes(qDigits) || (p.phone || '').includes(qPhone))))
+  // People is Next Steps' list. Welcome-card and group contacts live in
+  // Follow Up's Contacts until they come to a Sunday; once they check in
+  // they have steps and appear here too, as the same person.
+  const rows = people.filter((p) => ((p.source || 'next_steps') === 'next_steps' || p.steps_done > 0) &&
+    (!q || p.full_name.toLowerCase().includes(q) ||
+    (qDigits && ((p.phone || '').includes(qDigits) || (p.phone || '').includes(qPhone)))))
 
   // ---- modal state ----
   const [editPerson, setEditPerson] = useState(null)

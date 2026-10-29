@@ -2,16 +2,16 @@ import { useMemo, useState } from 'react'
 import { useAuth } from './hooks/useAuth.js'
 import { useToast } from './hooks/useToast.js'
 import { useAppData } from './hooks/useAppData.js'
-import { useFollowUp } from './hooks/useFollowUp.js'
-import { useSupportPeople } from './hooks/useSupportPeople.js'
-import { useMessages } from './hooks/useMessages.js'
+import { useFollowUpData } from './hooks/useFollowUpData.js'
+import { useMessaging } from './hooks/useMessaging.js'
+import { useBibleStudy } from './hooks/useBibleStudy.js'
+import { useTodayData } from './hooks/useTodayData.js'
 import { MeProvider } from './context/MeContext.jsx'
 import { ToastProvider } from './context/ToastContext.jsx'
-import { NAV_FULL, NAV_PROFILE, NAV_SUPPORT, NAV_TEAM } from './nav.jsx'
+import { firstPaneFor, navFor } from './nav.jsx'
 import Login from './auth/Login.jsx'
 import SetPassword from './auth/SetPassword.jsx'
-import Sidebar from './components/Sidebar.jsx'
-import BottomNav from './components/BottomNav.jsx'
+import Sidebar, { MobileTopBar } from './components/Sidebar.jsx'
 import ReadonlyBanner from './components/ReadonlyBanner.jsx'
 import Toast from './components/Toast.jsx'
 import VideoFallbackModal from './components/VideoFallbackModal.jsx'
@@ -20,12 +20,15 @@ import Today from './pages/Today.jsx'
 import SessionPane from './pages/SessionPane.jsx'
 import VideosPage from './pages/VideosPage.jsx'
 import People from './pages/People.jsx'
-import FollowUp from './pages/FollowUp.jsx'
 import Reports from './pages/Reports.jsx'
-import Messages from './pages/Messages.jsx'
-import SupportHouseChurch from './pages/SupportHouseChurch.jsx'
-import SupportFollowUp from './pages/SupportFollowUp.jsx'
-import SupportMembership from './pages/SupportMembership.jsx'
+import Messaging from './pages/Messaging.jsx'
+import FollowUpDashboard from './pages/FollowUpDashboard.jsx'
+import Contacts from './pages/Contacts.jsx'
+import Outcomes from './pages/Outcomes.jsx'
+import Membership from './pages/Membership.jsx'
+import HouseChurch from './pages/HouseChurch.jsx'
+import BibleStudy from './pages/BibleStudy.jsx'
+import BibleUpload from './pages/BibleUpload.jsx'
 import Team from './pages/Team.jsx'
 import Profile from './pages/Profile.jsx'
 
@@ -38,29 +41,36 @@ const BASE_CLASS = 'min-h-dvh font-sans bg-cream text-ink text-[15px] leading-[1
 export default function App() {
   const { status, me, authLinkType, signIn, requestReset, setPassword, signOut, refresh: refreshMe } = useAuth()
   const toastState = useToast()
-  const { html: toastHtml, visible: toastVisible, toast } = toastState
-  const { people, openSession, todaysCheckins, sessionFeed, refreshAll } = useAppData(me)
-  const followUp = useFollowUp(me, people)
-  const support = useSupportPeople(me)
-  const messages = useMessages(me)
+  const { html: toastHtml, visible: toastVisible } = toastState
+  const { people, openSession, sessionFeed, refreshAll } = useAppData(me)
+  const fu = useFollowUpData(me)
+  const msg = useMessaging(me)
+  const bs = useBibleStudy(me)
+  const today = useTodayData(me)
   const [fallbackUrl, setFallbackUrl] = useState(null)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [bsEditing, setBsEditing] = useState(null)
 
-  const nav = useMemo(() => {
-    if (!me) return []
-    if (me.role === 'support') return [...NAV_SUPPORT, NAV_PROFILE]
-    return me.role === 'director' ? [...NAV_FULL, NAV_TEAM, NAV_PROFILE] : [...NAV_FULL, NAV_PROFILE]
-  }, [me])
+  const nav = useMemo(() => (me ? navFor(me.role) : { top: [], groups: [], bottom: [] }), [me])
+  const allowedPanes = useMemo(() => new Set([...nav.top, ...nav.groups.flatMap((g) => g.items), ...nav.bottom].map((n) => n.id)), [nav])
 
-  // Follow-Up badges the queue waiting to be sent; Messages badges
-  // conversations with something unread, not the raw message count — ten
-  // messages from one person is one thing to deal with.
+  // Messaging badges conversations with something unread (ten messages from
+  // one person is one thing to deal with); Contacts badges who is waiting on
+  // a call, or for Follow Up callers, the calls assigned to them.
   const navCounts = {
-    followup: followUp.attended.length,
-    messages: messages.unreadCount,
+    messaging: msg.unreadCount,
+    contacts: me?.role === 'support'
+      ? fu.contacts.filter((c) => c.waiting && c.assigned_to === me.id).length
+      : fu.contacts.filter((c) => c.waiting).length,
   }
 
   const [activePane, setActivePane] = useState(null)
-  const pane = activePane ?? (me?.role === 'support' ? 'support-hc' : 'today')
+  const pane = activePane && allowedPanes.has(activePane) ? activePane : firstPaneFor(me?.role)
+  const navigate = (id) => {
+    if (id === 'today') today.refresh()
+    setActivePane(id)
+    window.scrollTo({ top: 0 })
+  }
 
   if (status === 'booting') return <div className={BASE_CLASS} />
   if (status === 'loggedOut') return <div className={BASE_CLASS}><Login onSignIn={signIn} onRequestReset={requestReset} /></div>
@@ -68,41 +78,57 @@ export default function App() {
     return <div className={BASE_CLASS}><SetPassword authLinkType={authLinkType} onSetPassword={setPassword} /></div>
   }
 
+  const isSupport = me.role === 'support'
+  const fuProps = { contacts: fu.contacts, outcomes: fu.outcomes, staff: fu.staff, refresh: fu.refresh }
+
   return (
     <MeProvider me={me}>
       <ToastProvider value={toastState}>
         <div className={BASE_CLASS}>
-          <div className="flex min-h-dvh">
-            <Sidebar nav={nav} activePane={pane} onNavigate={setActivePane} me={me} onSignOut={signOut} counts={navCounts} />
-            <main className="flex-1 pt-7.5 px-9 pb-22.5 max-mobile:pt-5 max-mobile:px-4 max-mobile:pb-24 max-w-290 w-full">
-              {me.role !== 'director' && <ReadonlyBanner />}
+          <MobileTopBar onOpen={() => setMenuOpen(true)} counts={navCounts} />
+          <div className="flex min-h-dvh max-mobile:min-h-[calc(100dvh-56px)]">
+            <Sidebar nav={nav} activePane={pane} onNavigate={navigate} me={me} onSignOut={signOut} counts={navCounts} mobileOpen={menuOpen} onCloseMobile={() => setMenuOpen(false)} />
+            <main className="flex-1 min-w-0 pt-7.5 px-9 pb-22.5 max-mobile:pt-5 max-mobile:px-4 max-mobile:pb-12 w-full">
+              {me.role === 'leader' && <ReadonlyBanner />}
 
-              <Pane active={pane === 'today'}><Today people={people} openSession={openSession} todaysCheckins={todaysCheckins} /></Pane>
-              <Pane active={pane === 'session'}>
-                <SessionPane onNavigate={setActivePane} openSession={openSession} sessionFeed={sessionFeed} onDataChange={refreshAll} />
-              </Pane>
-              <Pane active={pane === 'videos'}><VideosPage onNavigate={setActivePane} onFallback={setFallbackUrl} /></Pane>
-              <Pane active={pane === 'people'}><People people={people} onDataChange={refreshAll} /></Pane>
-              <Pane active={pane === 'followup'}>
-                <FollowUp people={people} attended={followUp.attended} awaiting={followUp.awaiting} noshows={followUp.noshows} STATUS_LABEL={followUp.STATUS_LABEL} refresh={followUp.refresh} />
-              </Pane>
-              <Pane active={pane === 'reports'}><Reports people={people} /></Pane>
-              <Pane active={pane === 'messages'}>
-                <Messages conversations={messages.conversations} people={people} refresh={messages.refresh} />
-              </Pane>
-              <Pane active={pane === 'support-hc'}>
-                <SupportHouseChurch list={support.hc} hadError={support.hadError} refresh={support.refresh} />
-              </Pane>
-              <Pane active={pane === 'support-followup'}>
-                <SupportFollowUp list={support.followup} hadError={support.hadError} refresh={support.refresh} />
-              </Pane>
-              <Pane active={pane === 'support-membership'}>
-                <SupportMembership list={support.membership} hadError={support.hadError} refresh={support.refresh} />
-              </Pane>
+              {!isSupport && (
+                <>
+                  <Pane active={pane === 'today'}>
+                    <Today people={people} contacts={fu.contacts} outcomes={fu.outcomes} sent={msg.sent} conversations={msg.conversations}
+                      checkinDates={today.checkinDates} followups={today.followups} bibleSessions={bs.sessions} onNavigate={navigate} />
+                  </Pane>
+                  <Pane active={pane === 'session'}>
+                    <SessionPane onNavigate={navigate} openSession={openSession} sessionFeed={sessionFeed} onDataChange={refreshAll} />
+                  </Pane>
+                  <Pane active={pane === 'videos'}><VideosPage onNavigate={navigate} onFallback={setFallbackUrl} /></Pane>
+                  <Pane active={pane === 'people'}><People people={people} onDataChange={refreshAll} /></Pane>
+                  <Pane active={pane === 'reports'}><Reports people={people} /></Pane>
+                  <Pane active={pane === 'messaging'}>
+                    <Messaging sent={msg.sent} inbound={msg.inbound} queued={msg.queued} conversations={msg.conversations}
+                      contacts={fu.contacts} people={people} refresh={msg.refresh} refreshContacts={fu.refresh} />
+                  </Pane>
+                  <Pane active={pane === 'bible'}>
+                    <BibleStudy series={bs.series} sessions={bs.sessions} loaded={bs.loaded} onNavigate={navigate}
+                      onEdit={(s) => { setBsEditing(s); navigate('bible-upload') }} />
+                  </Pane>
+                  {me.role === 'director' && (
+                    <Pane active={pane === 'bible-upload'}>
+                      <BibleUpload series={bs.series} editing={bsEditing} refresh={bs.refresh}
+                        onDone={() => { if (bsEditing) { setBsEditing(null); navigate('bible') } }} />
+                    </Pane>
+                  )}
+                </>
+              )}
+
+              <Pane active={pane === 'fu-dash'}><FollowUpDashboard {...fuProps} onNavigate={navigate} /></Pane>
+              <Pane active={pane === 'contacts'}><Contacts {...fuProps} /></Pane>
+              <Pane active={pane === 'outcomes'}><Outcomes {...fuProps} /></Pane>
+              <Pane active={pane === 'membership'}><Membership {...fuProps} /></Pane>
+              <Pane active={pane === 'house-church'}><HouseChurch {...fuProps} /></Pane>
+
               {me.role === 'director' && <Pane active={pane === 'team'}><Team /></Pane>}
               <Pane active={pane === 'profile'}><Profile onDataChange={refreshMe} /></Pane>
             </main>
-            <BottomNav nav={nav} activePane={pane} onNavigate={setActivePane} counts={navCounts} />
           </div>
           <Toast html={toastHtml} visible={toastVisible} />
           <VideoFallbackModal url={fallbackUrl} onClose={() => setFallbackUrl(null)} />

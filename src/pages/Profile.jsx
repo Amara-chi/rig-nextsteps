@@ -10,12 +10,12 @@ import { useMe } from '../context/MeContext.jsx'
 import { useAppToast } from '../context/ToastContext.jsx'
 import { supabase } from '../lib/supabaseClient.js'
 
-const ROLE_LABEL = { director: 'Admin', leader: 'Leader', support: 'Support' }
+const ROLE_LABEL = { director: 'Admin', leader: 'Leader', support: 'Follow Up' }
 const ROLE_BADGE = { director: 'orange', leader: 'navy', support: 'grey' }
 const ROLE_DETAIL = {
   director: 'Full access — can manage people, sessions, reports, and the team.',
   leader: 'Read-only — sees everyone, can add notes, cannot change records.',
-  support: 'Narrow access — house church, membership, and follow-up only.',
+  support: 'Follow Up — contacts, calls and outcomes. You can add contacts, log calls, and edit or delete the outcomes you logged.',
 }
 
 export default function Profile({ onDataChange }) {

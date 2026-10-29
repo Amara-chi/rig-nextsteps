@@ -76,7 +76,7 @@ export default function Login({ onSignIn, onRequestReset }) {
     <AuthShell>
       <h1 className="text-[30px] font-black tracking-[-.03em] text-ink-deep mt-5.5 leading-[1.05]">Team sign in.</h1>
       <div className="text-muted-sub text-[13.5px] mt-1.5">
-        For the Next Steps Admin and leadership. Visitors don't need an account — they use the QR code.
+        For church staff: Next Steps, Follow Up and leadership. Visitors don't need an account — they use the QR code.
       </div>
       <Field label="Email" htmlFor="l-email">
         <TextInput

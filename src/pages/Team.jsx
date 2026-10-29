@@ -12,7 +12,7 @@ import { useAppToast } from '../context/ToastContext.jsx'
 import { supabase } from '../lib/supabaseClient.js'
 import { isSuperAdmin as checkSuperAdmin } from '../config/site.js'
 
-const ROLE_LABEL = { director: 'Admin', leader: 'Leader', support: 'Support' }
+const ROLE_LABEL = { director: 'Admin', leader: 'Leader', support: 'Follow Up' }
 const ROLE_BADGE = { director: 'orange', leader: 'navy', support: 'grey' }
 const STAFF_ERR = {
   not_director: 'You need admin access to do that.',
@@ -132,7 +132,7 @@ export default function Team() {
         <Field label="Role">
           <Select value={inviteRole} onChange={(e) => setInviteRole(e.target.value)}>
             <option value="leader">Leader — read-only, can add notes</option>
-            <option value="support">Support — house church, membership &amp; follow-up only</option>
+            <option value="support">Follow Up — contacts, calls and outcomes</option>
             <option value="director">Admin — full access</option>
           </Select>
         </Field>
