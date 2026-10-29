@@ -83,17 +83,13 @@ Deno.serve(async (req) => {
     return json({ ok: false, error: "nothing to send" }, 400);
   }
 
-  // --- Authorisation: director sends to anyone; support only to the people
-  // support_visible_person() already lets it see. Leaders are read-only and
-  // send nothing, same as everywhere else in the app. ---
+  // --- Authorisation: the director only. The WhatsApp line belongs to Next
+  // Steps; the Follow Up team (support) has no access to it for any reason
+  // (org decision, 29 Oct 2026, replacing the 12 Oct scoped send), and
+  // leaders are read-only, same as everywhere else in the app. ---
   const { data: profile } = await caller
     .from("profiles").select("role").eq("id", user.id).maybeSingle();
-  const role = profile?.role;
-  if (role !== "director") {
-    if (role !== "support") return json({ ok: false, error: "not allowed" }, 403);
-    const { data: visible } = await caller.rpc("support_visible_person", { p_id: person_id });
-    if (!visible) return json({ ok: false, error: "not allowed" }, 403);
-  }
+  if (profile?.role !== "director") return json({ ok: false, error: "not allowed" }, 403);
 
   const { data: person } = await admin
     .from("people").select("id, full_name, phone").eq("id", person_id).maybeSingle();

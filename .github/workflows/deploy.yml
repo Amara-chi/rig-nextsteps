@@ -19,7 +19,9 @@ jobs:
           node-version: 24
 
       - name: Install Hostinger MCP server
-        run: npm install -g hostinger-api-mcp
+        # Pinned: tool names changed in v2.1.0 (28 Sep 2026) and broke the deploy
+        # silently. Bump on purpose, and update deploy.mjs if the names move again.
+        run: npm install -g hostinger-api-mcp@2.13.0
 
       - name: Install app dependencies
         run: npm ci

@@ -33,7 +33,9 @@ export default function ChatPanel({ person, completed = false, onClose, onSent, 
   const onReadRef = useRef(onRead)
   onReadRef.current = onRead
 
-  const canSend = me?.role === 'director' || me?.role === 'support'
+  // The admin only: the Follow Up team has no access to the WhatsApp line
+  // (29 Oct 2026), and leaders are read-only. whatsapp-send enforces the same.
+  const canSend = me?.role === 'director'
 
   const load = useCallback(async () => {
     if (!person?.id) return

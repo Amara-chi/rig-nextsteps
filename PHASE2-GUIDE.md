@@ -72,7 +72,7 @@ This is the "messages send themselves" upgrade. It uses Meta's **official WhatsA
    supabase functions deploy send-followups --no-verify-jwt
    ```
 4. **Secrets** (Supabase → Edge Functions → Secrets): `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_ID`.
-5. **Schedule it:** in Supabase → **Edge Functions → send-followups → Schedules** (or Integrations → Cron), add a schedule of `0 17 * * 0` — that's every Sunday at 17:00 UTC = **6pm Lagos time**, after the service. Add a second run `0 8 * * 1` (Monday 9am Lagos) as a safety sweep.
+5. **Schedule it:** run `supabase/schedule-sunday-followups.sql` once in the SQL editor (paste the service role key where it says, and the project ref). It schedules `0 15 * * 0`, every Sunday at 15:00 UTC = **4pm Lagos time**, the agreed send time. The function only messages people who checked in that day and have not been messaged yet, so running it again is harmless. To preview who it would message, call it with `?dry=1`.
 
 The function only auto-sends follow-ups created in the last 48 hours; anything it can't deliver stays visible in the app's Follow-Up queue for the human touch. Meta's free tier comfortably covers this volume (service conversations at this scale are effectively free; check current Meta pricing).
 

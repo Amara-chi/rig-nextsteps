@@ -114,7 +114,7 @@ there is the reference for the sidebar and Follow Up pages, `TodayN.dc.html` for
   idempotent; run AFTER the schema
 - `supabase/seed-bible-study.sql` — optional, idempotent: the Seven Churches series (8 sessions,
   Jul to Sep 2026) as written up on the design canvas. Run after v15.
-- `supabase/upgrade-v3.sql` through `upgrade-v15.sql` — only for databases created from older
+- `supabase/upgrade-v3.sql` through `upgrade-v16.sql` — only for databases created from older
   schema versions; NOT needed on fresh installs
 - `supabase/templates/` — the branded auth emails GoTrue sends: `reset-password.html`
   (forgot-password link) and `invite.html` (new staff member's first sign in). Same shell as
@@ -130,8 +130,16 @@ there is the reference for the sidebar and Follow Up pages, `TodayN.dc.html` for
 - `supabase/functions/email-report` — optional Edge Function: emails weekly report via Resend.
   Field selection and order matches `app_settings.report_fields` (see below) — same report,
   same customization, whether viewed on screen or emailed.
-- `supabase/functions/send-followups` — optional Edge Function: auto-sends WhatsApp follow-ups
-  via Meta WhatsApp Cloud API (requires approved template `next_steps_followup`)
+- `supabase/functions/send-followups` — the Sunday 4pm message (org decision, 12 Oct 2026):
+  sends the attended template to everyone who checked in THAT DAY (Lagos date) and is still
+  pending, records each in `whatsapp_messages` like `whatsapp-send` does, marks the followup
+  sent. Idempotent (someone already sent today's template is marked sent and skipped), leaves
+  anyone who just completed all 4 for a person unless `WHATSAPP_TEMPLATE_COMPLETED` exists,
+  never touches older pending rows. Accepts only the service role key (or `CRON_SECRET` via
+  `x-cron-secret`) because the anon key is public and this messages newcomers. `?dry=1`
+  previews. Scheduled by `supabase/schedule-sunday-followups.sql` (pg_cron + Vault, 0 15 * * 0
+  = 16:00 Lagos, no DST). The wording lives in `_shared/messages.ts`, a deliberate copy of
+  `src/config/site.js` because a function cannot import from `src/`: keep the two identical.
 - `supabase/functions/_shared/` — `email.ts` (the one email shell: banner, arch, CTA, plus
   `quote`/`section` blocks) and `mailer.ts` (SMTP send). Two audiences, deliberately separate:
   `NOTIFY_EMAILS` is operational (someone is waiting on a reply now) and `DIGEST_EMAILS` is
@@ -147,14 +155,20 @@ there is the reference for the sidebar and Follow Up pages, `TodayN.dc.html` for
   it names who is waiting and never moves anyone. Sends nothing at all on a quiet week.
 - `supabase/functions/whatsapp-send` + `whatsapp-webhook` — the two halves of the in-app
   WhatsApp chat (see "WhatsApp" below). `-send` is called from the browser by a signed-in
-  staff member and does the authorisation itself (director anyone, support only
-  `support_visible_person()`, leader never); `-webhook` is called by Meta with no session, so
+  staff member and does the authorisation itself (director only; support and leader never,
+  see "Follow Up has no WhatsApp access" below); `-webhook` is called by Meta with no session, so
   it deploys `--no-verify-jwt` and authenticates by verifying Meta's `X-Hub-Signature-256`
   against `WHATSAPP_APP_SECRET` instead. It fails closed: no app secret configured means every
   POST is rejected, because the alternative is a public endpoint anyone can post fabricated
   newcomer messages into.
 - `supabase/functions/manage-staff` — powers the Team pane (director-only): invite, remove, or
-  re-role staff without hand-running SQL. Deploy it (`supabase functions deploy manage-staff`)
+  re-role staff without hand-running SQL. **Invites create the account with a generated
+  password and email it with the sign-in link through the church's SMTP** (org decision,
+  12 Oct 2026): the GoTrue magic-link invite kept tripping people up (expired links, wrong
+  browser, wrong inbox), so `supabase/templates/invite.html` is no longer what new staff
+  receive. The director always sees the password too, in a "Sign-in details" box with a
+  copy button, whether or not the email went out (so it can be read out over the phone); if
+  SMTP is unset or the send fails the box says so and the account still exists. Passwords are 12 look-alike-free characters in three groups, crypto-random. Deploy it (`supabase functions deploy manage-staff`)
   for that pane to work; without it, role management still falls back to the manual SQL in
   `schema.sql`'s closing comment. Business rule enforced server-side, not just in the UI: a
   director can never remove or re-role themselves (no exceptions) or another director — only
@@ -243,7 +257,14 @@ Three staff roles, checked by `public.is_director()` / `is_leader()` / `is_suppo
   staff, not the church messaging a newcomer.
 - **Consequence: leaders can no longer send.** They could before, from their own phone. The
   church number is written to through the database's own rules, and leaders are read-only, so
-  the Send buttons are director-only now (support keeps its own scoped send).
+  the Send buttons are director-only now.
+- **Follow Up has no WhatsApp access, for any reason** (org decision, 29 Oct 2026, replacing
+  the 12 Oct one that gave support its own Messages page and a scoped send). The line belongs
+  to Next Steps. Support cannot read `whatsapp_messages` (RLS), mark read (`wa_mark_read`),
+  or send (`whatsapp-send` refuses it); the UI gives it no Messaging, no chat, no Send. It
+  still sees that a message FAILED (`v_contacts.reason = 'failed'`), because that is how Next
+  Steps hands someone over for a call, but `failed_error` is null for it. Don't give the Follow
+  Up group a chat or a Messages page back.
 - **The 24-hour customer service window** is the rule that shapes all of this. WhatsApp only
   permits free-form business messages within 24 hours of the person's last inbound message;
   outside it, only pre-approved templates. Encoded in three places on purpose:
@@ -272,7 +293,12 @@ Three staff roles, checked by `public.is_director()` / `is_leader()` / `is_suppo
   outcome is logged a person drops off Follow-Up's lists, so before this pane a reply from
   them landed in the database and was seen by nobody. `v_wa_conversations` is keyed on
   person_id, falling back to phone, so a message from a number not on file is still visible
-  rather than orphaned.
+  rather than orphaned. Since 12 Oct 2026 the pane lists EVERYONE on file, like a WhatsApp
+  contact list, with a search box: conversations first by latest activity, then a "Not
+  messaged yet" section by name, so a chat can be started with anyone from one place.
+  Messaging is director/leader only; Follow Up has no access (see above).
+- The read-only banner is leader-only. Support is not read-only (it adds contacts and logs
+  outcomes), so showing it there was misleading and it was removed from that view.
 - **Email alerts go through the church's own SMTP**, not Resend (the account already exists for
   `info@rigchurchlagos.org`). One email per conversation that needs attention, not one per
   message: only the message that takes a conversation from nothing-unread to something-unread
@@ -356,6 +382,14 @@ Three staff roles, checked by `public.is_director()` / `is_leader()` / `is_suppo
   before either writes it back) — harmless in dev, and doesn't happen in a production build,
   since StrictMode's extra invocation is stripped from `npm run build` output. Don't chase it
   as an app bug if seen only under `npm run dev`.
+- Real-browser checks: `puppeteer-core` driving the machine's own Edge
+  (`C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe`) against `npm run dev` +
+  the local stack works well for screenshots and overflow checks (compare
+  `document.documentElement.scrollWidth` to `clientWidth`); no browser download needed. Wait
+  for sign-in by watching for "Sign out" in the body text, NOT for the password input to
+  disappear: Profile's change-password fields are always mounted.
+- `<main>` must keep `min-w-0`: without it an unbreakable string (a long URL in a message
+  preview) widens the whole admin column past the viewport, found 12 Oct 2026.
 - Test data created while verifying against the local stack (people/checkins/followups/notes/
   sessions) should be deleted afterward via the REST API with the local `service_role` key —
   don't leave it for the next session to trip over.
@@ -405,7 +439,6 @@ Three staff roles, checked by `public.is_director()` / `is_leader()` / `is_suppo
 
 ## Roadmap candidates (discussed, not committed)
 - Note tags (prayer / action / for HC leader) + filtered overseer view
-- Automated WhatsApp via Cloud API (function exists; needs Meta setup)
 - Auto-email weekly report (function exists; needs Resend setup)
 - Gated video catch-up for people who miss a Sunday (admin-unlocked only)
 - Add TypeScript on top of the React port (`supabase gen types typescript`), now that the port
