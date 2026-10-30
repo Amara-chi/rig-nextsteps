@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import PageHead, { Breadcrumb, CrumbLink } from '../components/PageHead.jsx'
 import Card from '../components/Card.jsx'
 import Badge from '../components/Badge.jsx'
@@ -29,13 +29,26 @@ function Thumb({ src, title, sub, dur }) {
 
 // Bible Study: series grid, then a series' sessions, then one session in
 // the hero-and-tabs layout (Overview, Key teaching points, Resources,
-// Questions), with Previous / Next through the series.
-export default function BibleStudy({ series, sessions, loaded, onNavigate, onEdit }) {
+// Questions), with Previous / Next through the series. The video plays in
+// the hero itself; timestamps in Key teaching points jump the same player.
+export default function BibleStudy({ series, sessions, loaded, active, onNavigate, onEdit }) {
   const me = useMe()
   const isDirector = me?.role === 'director'
   const [seriesId, setSeriesId] = useState(null)
   const [sessionId, setSessionId] = useState(null)
   const [tab, setTab] = useState('overview')
+  // { t: start second, n: bump so the same timestamp twice still re-seeks }
+  const [player, setPlayer] = useState(null)
+  const playerRef = useRef(null)
+
+  // Panes never unmount, so leaving Bible Study (or the session) has to stop
+  // the player itself, or the teaching keeps playing behind another page.
+  useEffect(() => { setPlayer(null) }, [sessionId, active])
+
+  const play = (t) => {
+    setPlayer((p) => ({ t, n: (p?.n || 0) + 1 }))
+    playerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }
 
   const cur = series.find((s) => s.id === seriesId)
   const inSeries = sessions.filter((v) => v.series_id === seriesId)
@@ -59,15 +72,22 @@ export default function BibleStudy({ series, sessions, loaded, onNavigate, onEdi
             <h1 className="text-[clamp(24px,3.2vw,32px)] font-black tracking-[-.03em] leading-[1.08]">{v.title}</h1>
             <p className="text-sm text-nav-idle">{[v.taught_on && fmtDate(v.taught_on), v.duration, v.teacher && `Taught by ${v.teacher}`].filter(Boolean).join(' · ')}</p>
             <div className="flex gap-2 flex-wrap mt-2">
-              {url && <a href={url} target="_blank" rel="noopener" className="inline-flex items-center gap-2 min-h-11 px-4.5 rounded-xl bg-orange text-white no-underline font-extrabold text-sm">▶ Watch the session</a>}
+              {vid && <button type="button" onClick={() => (player ? playerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }) : play(0))} className="inline-flex items-center gap-2 min-h-11 px-4.5 rounded-xl bg-orange text-white font-extrabold text-sm">▶ Watch the session</button>}
               {v.passage && <a href={bible(v.passage)} target="_blank" rel="noopener" className="inline-flex items-center min-h-11 px-4.5 rounded-xl border-[1.5px] border-white/25 text-white no-underline font-bold text-sm">Read {v.passage}</a>}
               {isDirector && <button type="button" onClick={() => onEdit(v)} className="inline-flex items-center min-h-11 px-4.5 rounded-xl border-[1.5px] border-white/25 text-white font-bold text-sm">Edit</button>}
             </div>
           </div>
-          <a href={url || undefined} target="_blank" rel="noopener" aria-label="Play this session on YouTube" className="relative block min-h-65 bg-ink">
-            {thumbOf(v) && <img src={thumbOf(v)} alt="" className="absolute inset-0 w-full h-full object-cover" />}
-            {vid && <span className="absolute left-1/2 top-1/2 w-16 h-16 -ml-8 -mt-8 rounded-full bg-orange grid place-items-center text-white text-xl">▶</span>}
-          </a>
+          <div ref={playerRef} className="relative min-h-65 bg-ink">
+            {vid && player
+              ? <iframe key={player.n} src={`https://www.youtube-nocookie.com/embed/${vid}?autoplay=1&rel=0&modestbranding=1&start=${player.t}`} title={v.title}
+                  allow="autoplay; encrypted-media; fullscreen; picture-in-picture" allowFullScreen className="absolute inset-0 w-full h-full border-0" />
+              : (
+                <button type="button" disabled={!vid} onClick={() => play(0)} aria-label="Play this session" className="absolute inset-0 w-full h-full p-0">
+                  {thumbOf(v) && <img src={thumbOf(v)} alt="" className="absolute inset-0 w-full h-full object-cover" />}
+                  {vid && <span className="absolute left-1/2 top-1/2 w-16 h-16 -ml-8 -mt-8 rounded-full bg-orange grid place-items-center text-white text-xl">▶</span>}
+                </button>
+              )}
+          </div>
         </section>
 
         <div role="tablist" aria-label="Session content" className="flex gap-0.5 border-b-2 border-line overflow-x-auto">
@@ -100,7 +120,7 @@ export default function BibleStudy({ series, sessions, loaded, onNavigate, onEdi
               <ol className="flex flex-col">
                 {v.points.map((p, i) => (
                   <li key={i} className="flex gap-3.5 items-start py-3 border-b border-[#ECE7DA] last:border-b-0">
-                    {p.t ? <a href={vid ? `https://www.youtube.com/watch?v=${vid}&t=${toSeconds(p.t)}s` : undefined} target="_blank" rel="noopener" className="flex-none min-w-16 min-h-9 grid place-items-center font-mono text-xs font-semibold bg-orange-soft text-orange-deep rounded-lg no-underline">{p.t}</a> : <span className="min-w-16" />}
+                    {p.t ? <button type="button" disabled={!vid} onClick={() => play(toSeconds(p.t))} aria-label={`Play from ${p.t}`} className="flex-none min-w-16 min-h-9 grid place-items-center font-mono text-xs font-semibold bg-orange-soft text-orange-deep rounded-lg">{p.t}</button> : <span className="min-w-16" />}
                     <span className="text-sm leading-relaxed"><strong className="text-ink-deep">{p.head}</strong> {p.text}</span>
                   </li>
                 ))}

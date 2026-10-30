@@ -3,7 +3,8 @@
 -- Jul to Sep 2026), as written up in the Design canvas mockup.
 -- Optional. Run AFTER upgrade-v15.sql. Idempotent: skips anything that
 -- already exists by title, so it is safe to run twice.
--- Thumbnails come from YouTube (thumbnail_url left empty).
+-- Thumbnails are the canvas's own cover art, one per session, shipped with
+-- the site in public/images/bible-study/ (filled in at the end of this file).
 -- ============================================================
 insert into public.bs_series (title, short_title, description, intro, starts_on, planned_sessions)
 select 'The Seven Churches of Revelation', 'The Seven Churches',
@@ -99,3 +100,17 @@ select s.id, 7, 'Laodicea: The Lukewarm Church', '2026-09-01', 'Revelation 3:14â
 from public.bs_series s
 where s.title = 'The Seven Churches of Revelation'
 and not exists (select 1 from public.bs_sessions x where x.series_id = s.id and x.title = 'Laodicea: The Lukewarm Church');
+
+-- Cover art from the design canvas, one per session by number (0 to 7), and
+-- the introduction's cover for the series card. Only fills an empty
+-- thumbnail, so a cover chosen later in Upload is never overwritten. Safe to
+-- run on its own against a database seeded before the covers existed.
+update public.bs_sessions v
+set thumbnail_url = '/images/bible-study/seven-churches-' || v.number || '.jpg'
+from public.bs_series s
+where v.series_id = s.id and s.title = 'The Seven Churches of Revelation'
+and v.number between 0 and 7 and coalesce(v.thumbnail_url, '') = '';
+
+update public.bs_series
+set thumbnail_url = '/images/bible-study/seven-churches-0.jpg'
+where title = 'The Seven Churches of Revelation' and coalesce(thumbnail_url, '') = '';

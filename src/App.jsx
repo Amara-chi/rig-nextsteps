@@ -108,7 +108,7 @@ export default function App() {
                       contacts={fu.contacts} people={people} refresh={msg.refresh} refreshContacts={fu.refresh} />
                   </Pane>
                   <Pane active={pane === 'bible'}>
-                    <BibleStudy series={bs.series} sessions={bs.sessions} loaded={bs.loaded} onNavigate={navigate}
+                    <BibleStudy series={bs.series} sessions={bs.sessions} loaded={bs.loaded} active={pane === 'bible'} onNavigate={navigate}
                       onEdit={(s) => { setBsEditing(s); navigate('bible-upload') }} />
                   </Pane>
                   {me.role === 'director' && (
