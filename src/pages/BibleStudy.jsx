@@ -12,15 +12,27 @@ const card = 'text-left p-0 border border-line rounded-[18px] bg-white overflow-
 const thumbOf = (s) => s.thumbnail_url || youtubeThumb(s.youtube_url)
 const bible = (passage) => `https://www.biblegateway.com/passage/?search=${encodeURIComponent((passage || '').replace(/–/g, '-'))}&version=NKJV`
 
-function Thumb({ src, title, sub, dur }) {
+const COVERS = ['bg-cover-navy', 'bg-cover-rust', 'bg-cover-teal']
+
+// With no image, a series card gets the canvas's cover art drawn in place: sun,
+// two hills and the title, the same for every series bar the colour.
+function Thumb({ src, title, sub, dur, cover = 0 }) {
+  const art = !src && title
   return (
-    <div className="relative aspect-video overflow-hidden bg-ink">
+    <div className={`relative aspect-video overflow-hidden ${art ? COVERS[cover % COVERS.length] : 'bg-ink'}`}>
       {src && <img src={src} alt="" className="absolute inset-0 w-full h-full object-cover" loading="lazy" />}
-      {!src && (title || sub) && (
-        <div className="absolute left-4.5 bottom-4 flex flex-col gap-0.5 text-white">
-          {sub && <span className="font-mono text-[10px] tracking-[.14em] uppercase">{sub}</span>}
-          {title && <span className="text-[22px] font-black tracking-[-.02em] leading-none">{title}</span>}
-        </div>
+      {art && (
+        <>
+          <svg viewBox="0 0 320 180" preserveAspectRatio="xMidYMax slice" className="absolute inset-0 w-full h-full" aria-hidden="true">
+            <circle cx="250" cy="62" r="30" className="fill-cover-sun" />
+            <path d="M0 140 L60 105 L110 128 L175 88 L240 122 L320 96 V180 H0 Z" fill="black" opacity=".18" />
+            <path d="M0 162 L70 132 L135 152 L210 120 L275 146 L320 134 V180 H0 Z" fill="black" opacity=".28" />
+          </svg>
+          <div className="absolute left-4.5 top-6 right-28 flex flex-col gap-1 text-white">
+            <span className="text-[22px] font-black tracking-[-.02em] leading-none uppercase">{title}</span>
+            {sub && <span className="text-[11px] font-semibold">{sub}</span>}
+          </div>
+        </>
       )}
       {dur && <span className="absolute right-2.5 bottom-2.5 font-mono text-[10.5px] bg-ink-deep/85 text-white py-0.75 px-1.75 rounded-md">{dur}</span>}
     </div>
@@ -204,14 +216,14 @@ export default function BibleStudy({ series, sessions, loaded, active, onNavigat
         right={isDirector && <BtnSm onClick={() => onNavigate('bible-upload')}>Upload</BtnSm>}
       />
       <div className="grid gap-4.5 [grid-template-columns:repeat(auto-fit,minmax(min(300px,100%),1fr))]">
-        {series.map((s) => {
+        {series.map((s, i) => {
           const n = sessions.filter((v) => v.series_id === s.id).length
           const firstThumb = thumbOf(sessions.find((v) => v.series_id === s.id) || {})
           return (
             <button key={s.id} type="button" onClick={() => { setSeriesId(s.id); setSessionId(null) }} className={card}>
-              <Thumb src={s.thumbnail_url || firstThumb} title={s.short_title || s.title} />
+              <Thumb src={s.thumbnail_url || firstThumb} title={s.short_title || s.title} cover={i} />
               <div className="py-4 px-4.5 flex flex-col gap-1.5">
-                <span className="font-mono text-[10px] tracking-widest uppercase text-muted-label font-semibold">{n} {n === 1 ? 'session' : 'sessions'}{s.planned_sessions ? ` of ${s.planned_sessions}` : ''}{s.starts_on ? ` · from ${fmtDate(s.starts_on)}` : ''}</span>
+                <span className="font-mono text-[10px] tracking-widest uppercase text-muted-label font-semibold">{n ? `${n} ${n === 1 ? 'session' : 'sessions'}` : 'No sessions yet'}{s.planned_sessions ? ` of ${s.planned_sessions}` : ''}{s.starts_on ? ` · from ${fmtDate(s.starts_on)}` : ''}</span>
                 <span className="text-[17px] font-extrabold tracking-[-.02em] text-ink-deep leading-tight">{s.title}</span>
                 {s.description && <span className="text-[13px] text-muted-body leading-normal">{s.description}</span>}
               </div>

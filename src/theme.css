@@ -20,6 +20,13 @@
   --color-green: #2F8A5B;
   --color-green-soft: #DCEDE3;
 
+  /* Bible Study placeholder covers (the canvas's sun-and-hills art), used in
+     turn for any series without a cover image. */
+  --color-cover-rust: #C2461F;
+  --color-cover-teal: #1E6B62;
+  --color-cover-navy: #1F2A4D;
+  --color-cover-sun: #E89A5C;
+
   /* Repeated-but-previously-undeclared greys, named by where they show up. */
   --color-muted-label: #8A90A0;
   --color-muted-sub: #7A8090;

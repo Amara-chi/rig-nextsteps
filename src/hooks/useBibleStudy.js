@@ -13,7 +13,7 @@ export function useBibleStudy(me) {
   const load = useCallback(async () => {
     if (!enabled) return
     const [s, v] = await Promise.all([
-      supabase.from('bs_series').select('*').order('starts_on', { ascending: false, nullsFirst: false }),
+      supabase.from('bs_series').select('*').order('starts_on', { ascending: false, nullsFirst: false }).order('title'),
       supabase.from('bs_sessions').select('*').order('number', { ascending: true, nullsFirst: false }),
     ])
     setSeries(s.data || [])

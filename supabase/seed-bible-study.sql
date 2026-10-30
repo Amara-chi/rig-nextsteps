@@ -114,3 +114,17 @@ and v.number between 0 and 7 and coalesce(v.thumbnail_url, '') = '';
 update public.bs_series
 set thumbnail_url = '/images/bible-study/seven-churches-0.jpg'
 where title = 'The Seven Churches of Revelation' and coalesce(thumbnail_url, '') = '';
+
+-- Two placeholder series from the canvas mockup, there so the Bible Study
+-- grid doesn't look empty while only one series is written up. No sessions,
+-- dates or covers: the page draws the canvas's cover art for them. Delete
+-- them (or rename and fill them in from Upload) once real series exist.
+insert into public.bs_series (title, short_title, description)
+select 'Revelation: Chapter 4 Onwards', 'Revelation',
+  'From the throne room through the seals and trumpets. New sessions every Tuesday.'
+where not exists (select 1 from public.bs_series where title = 'Revelation: Chapter 4 Onwards');
+
+insert into public.bs_series (title, short_title, description)
+select 'From Daniel to Revelation', 'Daniel to Revelation',
+  'The prophecies of Daniel and how they open up the book of Revelation.'
+where not exists (select 1 from public.bs_series where title = 'From Daniel to Revelation');
