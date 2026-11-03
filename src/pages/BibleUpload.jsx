@@ -14,8 +14,16 @@ const xBtn = 'w-10 h-10.5 flex-none rounded-[10px] border-[1.5px] border-line bg
 async function upload(file, folder) {
   const path = `${folder}/${Date.now()}-${file.name.replace(/[^A-Za-z0-9._-]/g, '_')}`
   const { error } = await supabase.storage.from(BUCKET).upload(path, file, { upsert: false })
-  if (error) return null
-  return supabase.storage.from(BUCKET).getPublicUrl(path).data.publicUrl
+  if (error) return { error: error.message || 'unknown error' }
+  return { url: supabase.storage.from(BUCKET).getPublicUrl(path).data.publicUrl }
+}
+
+// A resource with a file or link but no name still counts: name it after
+// the file (or the link's site) rather than quietly dropping it on save.
+const resourceName = (r) => {
+  if (r.name.trim()) return r.name.trim()
+  if (r.kind === 'Link') { try { return new URL(r.url).hostname.replace(/^www\./, '') } catch { return r.url } }
+  return (r.url || '').split('/').pop().replace(/^\d+-/, '')
 }
 
 const blankSession = () => ({
@@ -56,14 +64,14 @@ export default function BibleUpload({ series, editing, onDone, refresh }) {
 
   const onThumb = async (e) => {
     const f = e.target.files?.[0]; if (!f) return
-    setBusy(true); const url = await upload(f, 'thumbnails'); setBusy(false)
-    if (!url) { toast("Couldn't upload that image."); return }
+    setBusy(true); const { url, error } = await upload(f, 'thumbnails'); setBusy(false)
+    if (!url) { toast(`Couldn't upload that image: ${error}`); return }
     if (mode === 'session') setS((x) => ({ ...x, thumbnail_url: url })); else setSr((x) => ({ ...x, thumbnail_url: url }))
   }
   const onResourceFile = (i) => async (e) => {
     const f = e.target.files?.[0]; if (!f) return
-    setBusy(true); const url = await upload(f, 'resources'); setBusy(false)
-    if (!url) { toast("Couldn't upload that file."); return }
+    setBusy(true); const { url, error } = await upload(f, 'resources'); setBusy(false)
+    if (!url) { toast(`Couldn't upload that file: ${error}`); return }
     setS((x) => ({ ...x, resources: x.resources.map((r, j) => (j === i ? { ...r, url, name: r.name || f.name } : r)) }))
   }
 
@@ -78,7 +86,7 @@ export default function BibleUpload({ series, editing, onDone, refresh }) {
       points: s.points.filter((p) => p.head.trim() || p.text.trim()),
       questions: s.questions.map((q) => q.trim()).filter(Boolean),
       glance: (s.glance || []).filter((g) => g.k && g.v),
-      resources: s.resources.filter((r) => r.name.trim()),
+      resources: s.resources.filter((r) => r.name.trim() || r.url).map((r) => ({ ...r, name: resourceName(r) || 'Resource' })),
       status, updated_at: new Date().toISOString(),
     }
     setBusy(true)
@@ -86,7 +94,7 @@ export default function BibleUpload({ series, editing, onDone, refresh }) {
       ? await supabase.from('bs_sessions').update(row).eq('id', editing.id)
       : await supabase.from('bs_sessions').insert(row)
     setBusy(false)
-    if (error) { toast("Couldn't save the session. Check your access."); return }
+    if (error) { toast(`Couldn't save the session: ${error.message}`); return }
     toast(status === 'published' ? 'Session published to its series.' : 'Draft saved. It stays hidden from leadership until you publish it.')
     refresh(); setS({ ...blankSession(), series_id: s.series_id }); onDone?.()
   }
