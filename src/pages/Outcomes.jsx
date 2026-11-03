@@ -36,6 +36,7 @@ export default function Outcomes({ contacts, outcomes, staff, refresh }) {
   const [week, setWeek] = useState('this')
   const [who, setWho] = useState('all')
   const [what, setWhat] = useState('all')
+  const [q, setQ] = useState('')
 
   const thisMon = startOfWeek(0), lastMon = startOfWeek(1)
   const inWeek = (o, w) => {
@@ -43,9 +44,17 @@ export default function Outcomes({ contacts, outcomes, staff, refresh }) {
     return w === 'all' || (w === 'this' ? t >= thisMon : t >= lastMon && t < thisMon)
   }
   const callers = [...new Map(outcomes.filter((o) => o.logged_by).map((o) => [o.logged_by, o.logged_by_name])).entries()]
+  // Search by the person's name or phone, what happened, or who logged it.
+  const needle = q.trim().toLowerCase()
+  const nDigits = needle.replace(/\D/g, '').replace(/^0/, '')
+  const phoneOf = new Map(contacts.map((c) => [c.id, c.phone || '']))
+  const matches = (o) => !needle
+    || [o.person_name, o.note, o.logged_by_name].some((s) => (s || '').toLowerCase().includes(needle))
+    || (nDigits.length >= 3 && phoneOf.get(o.person_id)?.includes(nDigits))
   const rows = outcomes.filter((o) => inWeek(o, week)
     && (who === 'all' || (who === 'mine' ? o.logged_by === me?.id : o.logged_by === who))
-    && (what === 'all' || o.action === what))
+    && (what === 'all' || o.action === what)
+    && matches(o))
   const thisWeek = outcomes.filter((o) => inWeek(o, 'this'))
   const count = (a) => thisWeek.filter((o) => o.action === a).length
   const canEdit = (o) => isDirector || (me?.role === 'support' && o.logged_by === me.id)
@@ -80,6 +89,9 @@ export default function Outcomes({ contacts, outcomes, staff, refresh }) {
 
       <Card>
         <div className="flex flex-col gap-2.5 mb-3.5">
+          <label htmlFor="oc-search" className="sr-only">Search outcomes</label>
+          <input id="oc-search" type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search by name, phone, note or who logged it"
+            className="w-full min-h-10.5 px-3.5 border-[1.5px] border-line rounded-[10px] text-sm bg-white outline-none focus:border-orange" />
           <div className="flex gap-3.5 flex-wrap">
             <Chips label="Filter by week" value={week} onChange={setWeek} options={[['this', 'This week'], ['last', 'Last week'], ['all', 'All time']]} />
             <Chips label="Filter by who logged it" value={who} onChange={setWho}
@@ -128,7 +140,7 @@ export default function Outcomes({ contacts, outcomes, staff, refresh }) {
             </tbody>
           </table>
         </div>
-        {!rows.length && <EmptyState>Nothing logged that matches these filters.</EmptyState>}
+        {!rows.length && <EmptyState>{needle ? 'No outcomes match that search with these filters.' : 'Nothing logged that matches these filters.'}</EmptyState>}
       </Card>
       {dlg.dialogs}
     </>
