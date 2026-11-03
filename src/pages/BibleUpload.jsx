@@ -48,6 +48,7 @@ export default function BibleUpload({ series, editing, onDone, refresh }) {
   const [s, setS] = useState(blankSession)
   const [sr, setSr] = useState({ title: '', short_title: '', description: '', intro: '', starts_on: '', planned_sessions: '', thumbnail_url: '' })
   const [busy, setBusy] = useState(false)
+  const [unsaved, setUnsaved] = useState(false)
 
   useEffect(() => {
     if (editing) {
@@ -73,7 +74,18 @@ export default function BibleUpload({ series, editing, onDone, refresh }) {
     setBusy(true); const { url, error } = await upload(f, 'resources'); setBusy(false)
     if (!url) { toast(`Couldn't upload that file: ${error}`); return }
     setS((x) => ({ ...x, resources: x.resources.map((r, j) => (j === i ? { ...r, url, name: r.name || f.name } : r)) }))
+    setUnsaved(true)
+    toast('File uploaded. Save draft or Publish session to attach it to the session.')
   }
+
+  // An uploaded file is only in storage until the session is saved; warn
+  // before the page is closed or reloaded with it still unattached.
+  useEffect(() => {
+    if (!unsaved) return
+    const warn = (e) => { e.preventDefault(); e.returnValue = '' }
+    window.addEventListener('beforeunload', warn)
+    return () => window.removeEventListener('beforeunload', warn)
+  }, [unsaved])
 
   const saveSession = async (status) => {
     if (!s.series_id) { toast('Pick a series first, or create one.'); return }
@@ -90,11 +102,15 @@ export default function BibleUpload({ series, editing, onDone, refresh }) {
       status, updated_at: new Date().toISOString(),
     }
     setBusy(true)
-    const { error } = editing
-      ? await supabase.from('bs_sessions').update(row).eq('id', editing.id)
-      : await supabase.from('bs_sessions').insert(row)
+    // .select() so a write the database quietly filtered out (no error, no
+    // row) is reported instead of being shown as saved.
+    const { data, error } = editing
+      ? await supabase.from('bs_sessions').update(row).eq('id', editing.id).select('id')
+      : await supabase.from('bs_sessions').insert(row).select('id')
     setBusy(false)
     if (error) { toast(`Couldn't save the session: ${error.message}`); return }
+    if (!data?.length) { toast("Nothing was saved. Sign in with the admin account and try again."); return }
+    setUnsaved(false)
     toast(status === 'published' ? 'Session published to its series.' : 'Draft saved. It stays hidden from leadership until you publish it.')
     refresh(); setS({ ...blankSession(), series_id: s.series_id }); onDone?.()
   }

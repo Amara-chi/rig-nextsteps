@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabaseClient.js'
+import { usePolling } from './usePolling.js'
 
-// Bible Study series and sessions. Not polled: this changes when the admin
-// uploads, and the upload page refreshes it itself. RLS hides drafts from
-// leadership, so the same query serves both roles.
+// Bible Study series and sessions. Polled slowly: the upload page refreshes
+// its own copy, but another computer already open on the platform would
+// otherwise never see a new session or resource until it reloaded. RLS
+// hides drafts from leadership, so the same query serves both roles.
 export function useBibleStudy(me) {
   const [series, setSeries] = useState([])
   const [sessions, setSessions] = useState([])
@@ -22,6 +24,7 @@ export function useBibleStudy(me) {
   }, [enabled])
 
   useEffect(() => { load() }, [load])
+  usePolling(load, { intervalMs: 30000, enabled })
   return { series, sessions, loaded, refresh: load }
 }
 
