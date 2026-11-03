@@ -25,6 +25,8 @@ export function useContactDialogs({ contacts, outcomes, staff, refresh }) {
         onChanged={refresh}
         onLog={(c) => setOutcomeFor({ person: c })}
         onEdit={(c) => setForm({ contact: c })}
+        onEditOutcome={(o) => setOutcomeFor({ outcome: o })}
+        onDeleteOutcome={(o) => setDeleting(o)}
       />
       <OutcomeDialog
         open={!!outcomeFor}

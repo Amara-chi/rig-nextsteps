@@ -19,6 +19,12 @@ export const fmtTime = (ts) => (ts ? new Date(ts).toLocaleTimeString('en-GB', { 
 
 export const todayStr = () => new Date().toISOString().slice(0, 10)
 
+// The calendar day a timestamp falls on here (YYYY-MM-DD), for date inputs.
+export const localDay = (ts) => {
+  const d = ts ? new Date(ts) : new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 export const fillMsg = (tpl, name, step) => tpl.replace(/\[Name\]/g, name).replace(/\[Step\]/g, step)
 
 // tel: link for a stored phone. Stored numbers are digits only, Nigerian

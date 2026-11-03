@@ -8,7 +8,7 @@ import Field, { TextInput, Select, Textarea } from './Field.jsx'
 import { useMe } from '../context/MeContext.jsx'
 import { useAppToast } from '../context/ToastContext.jsx'
 import { supabase } from '../lib/supabaseClient.js'
-import { fmtBirthday, fmtDate, fmtPhone, fmtWhen, telHref, todayStr } from '../lib/format.js'
+import { fmtBirthday, fmtDate, fmtPhone, fmtWhen, localDay, telHref, todayStr } from '../lib/format.js'
 import { AGE_RANGES, CONTACT_REASONS, CONTACT_SOURCES, MONTHS, OUTCOME_ACTIONS, outcomeLabel } from '../config/site.js'
 
 // Shared pieces for the Follow Up pages (dashboard, Contacts, Outcomes,
@@ -69,6 +69,7 @@ export function OutcomeDialog({ open, person, outcome, contacts = [], staff = []
   const [action, setAction] = useState('called')
   const [note, setNote] = useState('')
   const [by, setBy] = useState('')
+  const [day, setDay] = useState('')
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
@@ -77,6 +78,7 @@ export function OutcomeDialog({ open, person, outcome, contacts = [], staff = []
     setAction(outcome?.action || 'called')
     setNote(outcome?.note || '')
     setBy(outcome?.logged_by || me?.id || '')
+    setDay(localDay(outcome?.created_at))
   }, [open, person, outcome, me])
 
   const picking = !person && !outcome
@@ -85,8 +87,13 @@ export function OutcomeDialog({ open, person, outcome, contacts = [], staff = []
 
   const save = async () => {
     if (!personId) { toast('Pick who you contacted.'); return }
+    if (!day || day > localDay()) { toast('Pick the day it happened, today or earlier.'); return }
     setSaving(true)
     const row = { action, note: note.trim() || null }
+    // Today (or an unchanged day on an edit) keeps the real time; another
+    // day is recorded at midday Lagos time so it never slips across midnight.
+    const unchanged = editing ? day === localDay(outcome.created_at) : day === localDay()
+    if (!unchanged) row.created_at = `${day}T12:00:00+01:00`
     if (isDirector) row.logged_by = by || me.id
     const { error } = editing
       ? await supabase.from('outcomes').update(row).eq('id', outcome.id)
@@ -132,6 +139,9 @@ export function OutcomeDialog({ open, person, outcome, contacts = [], staff = []
           <Select id="oc-action" value={action} onChange={(e) => setAction(e.target.value)}>
             {OUTCOME_ACTIONS.map((a) => <option key={a.id} value={a.id}>{a.label}</option>)}
           </Select>
+        </Field>
+        <Field label="When was it?" htmlFor="oc-day">
+          <TextInput id="oc-day" type="date" value={day} max={localDay()} onChange={(e) => setDay(e.target.value)} />
         </Field>
       </div>
       {target?.prayer_request && (
@@ -279,7 +289,7 @@ export function ContactFormDialog({ open, contact, staff = [], onClose, onSaved 
 }
 
 // ---------- The contact panel: the whole record in one place ----------
-export function ContactPanel({ contact, outcomes = [], staff = [], onClose, onChanged, onLog, onEdit }) {
+export function ContactPanel({ contact, outcomes = [], staff = [], onClose, onChanged, onLog, onEdit, onEditOutcome, onDeleteOutcome }) {
   const me = useMe()
   const toast = useAppToast()
   const isDirector = me?.role === 'director'
@@ -287,6 +297,7 @@ export function ContactPanel({ contact, outcomes = [], staff = [], onClose, onCh
   if (!contact) return null
   const c = contact
   const mine = outcomes.filter((o) => o.person_id === c.id)
+  const canEditOutcome = (o) => isDirector || (me?.role === 'support' && o.logged_by === me.id)
 
   const take = async () => {
     const { data } = await supabase.rpc('take_contact', { p_id: c.id })
@@ -352,7 +363,15 @@ export function ContactPanel({ contact, outcomes = [], staff = [], onClose, onCh
           <div key={o.id} className="flex gap-3 items-start py-2.5 border-b border-[#ECE7DA] last:border-b-0">
             <span className="flex-none w-7 h-7 rounded-full bg-green-soft text-green grid place-items-center" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><path d="M5 12l5 5 9-10" /></svg></span>
             <div className="flex-1 text-[13px] leading-normal"><strong>{outcomeLabel(o.action)}.</strong> {o.note || 'No note written.'}</div>
-            <div className="font-mono text-[10.5px] text-muted-label whitespace-nowrap">{o.logged_by_name || 'No caller recorded'} · {fmtWhen(o.created_at)}</div>
+            <div className="flex flex-col items-end gap-1.5">
+              <div className="font-mono text-[10.5px] text-muted-label whitespace-nowrap">{o.logged_by_name || 'No caller recorded'} · {fmtWhen(o.created_at)}</div>
+              {canEditOutcome(o) && (
+                <div className="flex gap-1">
+                  <button type="button" title="Edit outcome" onClick={() => onEditOutcome?.(o)} className="text-muted-icon text-xs leading-none py-0.75 px-1.25 rounded-md hover:text-orange-deep hover:bg-orange-soft">✎</button>
+                  <button type="button" title="Delete outcome" onClick={() => onDeleteOutcome?.(o)} className="text-muted-icon text-[15px] leading-none py-0.5 px-1 rounded-md hover:text-orange-deep hover:bg-orange-soft">✕</button>
+                </div>
+              )}
+            </div>
           </div>
         )) : <div className="text-[13px] text-muted-faint py-2.5">Nothing logged yet.</div>}
       </div>

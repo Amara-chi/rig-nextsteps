@@ -114,7 +114,7 @@ there is the reference for the sidebar and Follow Up pages, `TodayN.dc.html` for
   idempotent; run AFTER the schema
 - `supabase/seed-bible-study.sql` — optional, idempotent: the Seven Churches series (8 sessions,
   Jul to Sep 2026) as written up on the design canvas. Run after v15.
-- `supabase/upgrade-v3.sql` through `upgrade-v16.sql` — only for databases created from older
+- `supabase/upgrade-v3.sql` through `upgrade-v17.sql` — only for databases created from older
   schema versions; NOT needed on fresh installs
 - `supabase/templates/` — the branded auth emails GoTrue sends: `reset-password.html`
   (forgot-password link) and `invite.html` (new staff member's first sign in). Same shell as
@@ -200,7 +200,9 @@ there is the reference for the sidebar and Follow Up pages, `TodayN.dc.html` for
   never chased. Outcomes are logged after the fact in `public.outcomes` (one row per call,
   credited to whoever made it). Triggers keep the rest in step: logging one closes the
   person's open follow-up and writes the matching person_note; editing it rewrites both;
-  deleting it removes the note and reopens the follow-up. `followups.outcome` is still
+  deleting it removes the note and reopens the follow-up. The form asks when it happened
+  (today by default, never the future); a past day is stored at midday Lagos time and the
+  note takes the same date (v17). `followups.outcome` is still
   written (other code and the Monday digest read it) but `outcomes` is the record.
 - Follow Up's contacts are rows in the SAME `people` table, with `source` ('next_steps',
   'welcome_card', 'group', 'referral'), so a welcome-card visitor who later scans the QR code
