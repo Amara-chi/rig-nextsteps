@@ -166,10 +166,9 @@ export default function Membership({ contacts, outcomes, staff, refresh }) {
               <CallLink phone={c.phone} />
               <div className="flex gap-1.5">
                 {c.is_worker
-                  ? <BtnSm variant="outline" onClick={() => dlg.addNote(c)}>Add a note</BtnSm>
+                  ? <BtnSm onClick={() => dlg.addNote(c)}>Add a note</BtnSm>
                   : canLog && <BtnSm variant="outline" onClick={() => dlg.logOutcome(c)}>Log a call</BtnSm>}
                 {isDirector && s === 'ready' && <BtnSm onClick={() => { setDate(todayStr()); setRecording(c) }}>Record membership</BtnSm>}
-                {isDirector && s === 'member' && <BtnSm variant="outline" className="border-[#E8B4A6]! text-orange-deep!" onClick={() => dlg.deleteContact(c)}>Delete</BtnSm>}
               </div>
             </div>
           )
