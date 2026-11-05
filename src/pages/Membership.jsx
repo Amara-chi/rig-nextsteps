@@ -97,11 +97,17 @@ export default function Membership({ contacts, outcomes, staff, refresh }) {
   const isDirector = me?.role === 'director'
   const canLog = isDirector || me?.role === 'support'
   const dlg = useContactDialogs({ contacts, outcomes, staff, refresh })
-  const [stage, setStage] = useState('ready')
-  const [dept, setDept] = useState('all')
+  const [stage, setStageRaw] = useState('member')
+  const [dept, setDeptRaw] = useState('all')
   const [recording, setRecording] = useState(null)
   const [date, setDate] = useState(todayStr())
   const [adding, setAdding] = useState(false)
+  // Bulk actions (admin only): ticked rows, and which bulk dialog is open.
+  const [picked, setPicked] = useState(() => new Set())
+  const [bulk, setBulk] = useState(null) // 'record' | 'dept' | 'delete'
+  const [bulkDept, setBulkDept] = useState('')
+  const setStage = (v) => { setStageRaw(v); setPicked(new Set()) }
+  const setDept = (v) => { setDeptRaw(v); setPicked(new Set()) }
 
   const pipeline = contacts.filter((c) => c.steps_done === 4 || c.member_since)
   const stageOf = (c) => (c.member_since ? 'member' : daysSince(c.completed_on) >= WINDOW_DAYS ? 'ready' : 'open')
@@ -119,6 +125,31 @@ export default function Membership({ contacts, outcomes, staff, refresh }) {
     refresh()
   }
 
+  // Only ticked rows still on screen count, so a refresh that moves someone
+  // to another stage never acts on them by surprise.
+  const chosen = rows.filter((c) => picked.has(c.id))
+  const allPicked = rows.length > 0 && chosen.length === rows.length
+  const toggle = (id) => setPicked((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n })
+  const toggleAll = () => setPicked(allPicked ? new Set() : new Set(rows.map((c) => c.id)))
+  const ids = chosen.map((c) => c.id)
+  const n = chosen.length
+  const people = (k) => `${k} ${k === 1 ? 'person' : 'people'}`
+
+  const bulkUpdate = async (patch, done) => {
+    const { error } = await supabase.from('people').update(patch).in('id', ids)
+    if (error) { toast(`Couldn't update them: ${error.message}`); return false }
+    toast(done); setPicked(new Set()); refresh()
+  }
+  const bulkSave = async () => {
+    if (bulk === 'record') return bulkUpdate({ member_since: date }, `${people(n)} recorded as members from ${fmtDate(date)}.`)
+    if (bulk === 'dept') return bulkUpdate({ worker_department: bulkDept.trim() || null }, bulkDept.trim() ? `${people(n)} moved to ${bulkDept.trim()}.` : `Department cleared for ${people(n)}.`)
+    if (bulk === 'delete') {
+      const { error } = await supabase.from('people').delete().in('id', ids)
+      if (error) { toast(`Couldn't delete them: ${error.message}`); return false }
+      toast(`${people(n)} deleted.`); setPicked(new Set()); refresh()
+    }
+  }
+
   return (
     <>
       <PageHead
@@ -128,24 +159,42 @@ export default function Membership({ contacts, outcomes, staff, refresh }) {
         right={isDirector && <BtnSm onClick={() => setAdding(true)}>+ Add a member or worker</BtnSm>}
       />
       <div className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(min(150px,100%),1fr))] mb-5.5">
-        <Stat label="Window open" value={counts.open} detail="Within 30 days of step 4" />
-        <Stat label="Ready for a decision" value={counts.ready} detail="Window has passed" />
         <Stat label="Members" value={counts.member} detail="Recorded" />
         <Stat label="Workers" value={workers.length} detail="Members who serve" />
+        <Stat label="Window open" value={counts.open} detail="Within 30 days of step 4" />
+        <Stat label="Ready for a decision" value={counts.ready} detail="Window has passed" />
       </div>
       <Card>
-        <div className="mb-3"><Chips label="Filter by stage" value={stage} onChange={setStage} options={[['open', 'Window open'], ['ready', 'Ready for a decision'], ['member', 'Members'], ['workers', 'Workers']]} /></div>
+        <div className="mb-3"><Chips label="Filter by stage" value={stage} onChange={setStage} options={[['member', 'Members'], ['workers', 'Workers'], ['open', 'Window open'], ['ready', 'Ready for a decision']]} /></div>
         {stage === 'workers' && (
           <div className="mb-3">
             <Chips label="Filter workers by department" value={dept} onChange={setDept}
               options={[['all', 'All departments'], ...departments.map((d) => [d, `${d} (${workers.filter((c) => c.worker_department === d).length})`]), ...(workers.some((c) => !c.worker_department) ? [['none', 'No department yet']] : [])]} />
           </div>
         )}
-        {rows.map((c) => {
+        {isDirector && rows.length > 0 && (
+          <div className="flex items-center gap-2 flex-wrap py-2.5 px-3 -mx-1 mb-1 rounded-xl bg-row-hover">
+            <label className="flex items-center gap-2 text-[12.5px] font-bold text-ink-deep mr-2">
+              <input type="checkbox" checked={allPicked} onChange={toggleAll} className="w-4 h-4 accent-orange" />
+              {n ? `${n} selected` : 'Select all'}
+            </label>
+            {n > 0 && <>
+              {stage === 'ready' && <BtnSm onClick={() => { setDate(todayStr()); setBulk('record') }}>Record membership</BtnSm>}
+              {stage === 'member' && chosen.some((c) => !c.is_worker) && <BtnSm variant="outline" onClick={() => bulkUpdate({ is_worker: true }, `${people(chosen.filter((c) => !c.is_worker).length)} tagged as workers.`)}>Make workers</BtnSm>}
+              {(stage === 'workers' || chosen.every((c) => c.is_worker)) && stage !== 'ready' && stage !== 'open' && <BtnSm variant="outline" onClick={() => { setBulkDept(''); setBulk('dept') }}>Set department</BtnSm>}
+              {stage === 'workers' && <BtnSm variant="outline" onClick={() => bulkUpdate({ is_worker: false, worker_title: null, worker_department: null }, `${people(n)} removed from workers.`)}>Remove from workers</BtnSm>}
+              <BtnSm variant="outline" className="border-[#E8B4A6]! text-orange-deep!" onClick={() => setBulk('delete')}>Delete</BtnSm>
+              <button type="button" onClick={() => setPicked(new Set())} className="text-xs font-bold text-muted-sub underline ml-auto">Clear</button>
+            </>}
+          </div>
+        )}
+        {rows.map((c, i) => {
           const s = stageOf(c)
           const left = WINDOW_DAYS - daysSince(c.completed_on)
           return (
             <div key={c.id} className="flex items-center gap-3 py-3 border-b border-[#ECE7DA] last:border-b-0 flex-wrap">
+              {isDirector && <input type="checkbox" aria-label={`Select ${c.full_name}`} checked={picked.has(c.id)} onChange={() => toggle(c.id)} className="w-4 h-4 flex-none accent-orange" />}
+              <span className="w-7 flex-none text-right font-mono text-[11px] text-muted-label">{i + 1}.</span>
               {c.steps_done === 4
                 ? <div className="flex gap-0.75 flex-none" aria-label="All four steps done">{[0, 1, 2, 3].map((i) => <span key={i} className="w-2.25 h-3.25 rounded-arch bg-orange" />)}</div>
                 : <div className="w-[45px] flex-none" aria-hidden="true" />}
@@ -186,6 +235,23 @@ export default function Membership({ contacts, outcomes, staff, refresh }) {
         onSave={record}
       >
         <Field label="Member since" htmlFor="ms-date"><TextInput id="ms-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} /></Field>
+      </Modal>
+      <Modal
+        open={!!bulk}
+        title={bulk === 'record' ? `Record membership for ${people(n)}` : bulk === 'dept' ? `Set department for ${people(n)}` : `Delete ${people(n)}?`}
+        sub={bulk === 'record' ? 'Only after leadership has decided. This writes the date on each record; it does not make the decision.' : chosen.map((c) => c.full_name).join(', ')}
+        saveLabel={bulk === 'delete' ? 'Yes, delete' : bulk === 'record' ? 'Record it' : 'Save'}
+        onClose={() => setBulk(null)}
+        onSave={bulkSave}
+      >
+        {bulk === 'record' && <Field label="Member since" htmlFor="bk-date"><TextInput id="bk-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} /></Field>}
+        {bulk === 'dept' && (
+          <Field label={<>Department <span className="font-medium text-muted-label">(empty = no department)</span></>} htmlFor="bk-dept">
+            <TextInput id="bk-dept" list="bk-depts" value={bulkDept} onChange={(e) => setBulkDept(e.target.value)} />
+            <datalist id="bk-depts">{departments.map((d) => <option key={d} value={d} />)}</datalist>
+          </Field>
+        )}
+        {bulk === 'delete' && <p className="text-[13px] text-muted-body mt-3">This removes them from the platform permanently, with their notes, outcomes and any check-ins. It cannot be undone.</p>}
       </Modal>
       <AddMemberDialog open={adding} departments={departmentsOf(contacts)} onClose={() => setAdding(false)} onSaved={refresh} />
       {dlg.dialogs}
