@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ContactFormDialog, ContactPanel, DeleteOutcomeDialog, OutcomeDialog } from './followup.jsx'
+import { ContactFormDialog, ContactPanel, DeleteOutcomeDialog, OutcomeDialog, departmentsOf } from './followup.jsx'
 import ImportContacts from './ImportContacts.jsx'
 
 // One set of dialogs per Follow Up page: open a contact, log or edit an
@@ -21,6 +21,7 @@ export function useContactDialogs({ contacts, outcomes, staff, refresh }) {
         contact={panel}
         outcomes={outcomes}
         staff={staff}
+        departments={departmentsOf(contacts)}
         onClose={() => setPanelId(null)}
         onChanged={refresh}
         onLog={(c) => setOutcomeFor({ person: c })}

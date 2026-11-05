@@ -48,19 +48,26 @@ export function WorkerBadge({ c }) {
   return <Badge variant="navy">{c.worker_title ? `Worker · ${c.worker_title}` : 'Worker'}</Badge>
 }
 
-// The admin tags a worker and sets an optional title, in the contact panel.
-// Admin only, like recording membership (people is director-write in RLS).
-function WorkerField({ c, onChanged }) {
+// Every department already in use, for the department suggestions and the
+// Membership filter, so the same name is not typed three different ways.
+export const departmentsOf = (contacts) =>
+  [...new Set(contacts.map((c) => (c.is_worker && c.worker_department) || '').filter(Boolean))].sort((a, b) => a.localeCompare(b))
+
+// The admin tags a worker and sets an optional title and department, in the
+// contact panel. Admin only, like recording membership (people is
+// director-write in RLS).
+function WorkerField({ c, departments = [], onChanged }) {
   const toast = useAppToast()
   const [worker, setWorker] = useState(!!c.is_worker)
   const [title, setTitle] = useState(c.worker_title || '')
+  const [dept, setDept] = useState(c.worker_department || '')
   const [saving, setSaving] = useState(false)
-  useEffect(() => { setWorker(!!c.is_worker); setTitle(c.worker_title || '') }, [c.id, c.is_worker, c.worker_title])
-  const changed = worker !== !!c.is_worker || title.trim() !== (c.worker_title || '')
+  useEffect(() => { setWorker(!!c.is_worker); setTitle(c.worker_title || ''); setDept(c.worker_department || '') }, [c.id, c.is_worker, c.worker_title, c.worker_department])
+  const changed = worker !== !!c.is_worker || title.trim() !== (c.worker_title || '') || dept.trim() !== (c.worker_department || '')
 
   const save = async () => {
     setSaving(true)
-    const { error } = await supabase.from('people').update({ is_worker: worker, worker_title: worker ? title.trim() || null : null }).eq('id', c.id)
+    const { error } = await supabase.from('people').update({ is_worker: worker, worker_title: worker ? title.trim() || null : null, worker_department: worker ? dept.trim() || null : null }).eq('id', c.id)
     setSaving(false)
     if (error) { toast(`Couldn't save that: ${error.message}`); return }
     toast(worker ? `${c.full_name} is tagged as a worker.` : `${c.full_name} is no longer tagged as a worker.`)
@@ -73,7 +80,13 @@ function WorkerField({ c, onChanged }) {
         <input type="checkbox" checked={worker} onChange={(e) => setWorker(e.target.checked)} className="w-4 h-4 accent-orange" />
         Serves as a worker
       </label>
-      {worker && <TextInput id="cp-worker-title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title, if they have one (e.g. Prophetic Lead)" />}
+      {worker && (
+        <div className="grid gap-2 grid-cols-2 max-mobile:grid-cols-1">
+          <TextInput id="cp-worker-title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title, if they have one" aria-label="Title" />
+          <TextInput id="cp-worker-dept" list="cp-worker-depts" value={dept} onChange={(e) => setDept(e.target.value)} placeholder="Department" aria-label="Department" />
+          <datalist id="cp-worker-depts">{departments.map((d) => <option key={d} value={d} />)}</datalist>
+        </div>
+      )}
       {changed && <BtnSm className="mt-2" disabled={saving} onClick={save}>{saving ? 'Saving…' : 'Save'}</BtnSm>}
     </Field>
   )
@@ -326,7 +339,7 @@ export function ContactFormDialog({ open, contact, staff = [], onClose, onSaved 
 }
 
 // ---------- The contact panel: the whole record in one place ----------
-export function ContactPanel({ contact, outcomes = [], staff = [], onClose, onChanged, onLog, onEdit, onEditOutcome, onDeleteOutcome }) {
+export function ContactPanel({ contact, outcomes = [], staff = [], departments = [], onClose, onChanged, onLog, onEdit, onEditOutcome, onDeleteOutcome }) {
   const me = useMe()
   const toast = useAppToast()
   const isDirector = me?.role === 'director'
@@ -388,7 +401,7 @@ export function ContactPanel({ contact, outcomes = [], staff = [], onClose, onCh
           </Select>
         </Field>
       )}
-      {isDirector && <WorkerField c={c} onChanged={onChanged} />}
+      {isDirector && <WorkerField c={c} departments={departments} onChanged={onChanged} />}
       {c.prayer_request && (
         <div className="mt-4 bg-row-hover rounded-xl py-3.5 px-4">
           <div className="font-mono text-[9.5px] tracking-[.12em] uppercase text-muted-label font-semibold mb-1.5">Prayer request</div>

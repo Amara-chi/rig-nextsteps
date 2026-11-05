@@ -6,7 +6,7 @@ import BtnSm from '../components/BtnSm.jsx'
 import Modal from '../components/Modal.jsx'
 import Field, { TextInput } from '../components/Field.jsx'
 import EmptyState from '../components/EmptyState.jsx'
-import { CallLink, Chips, Stat, WorkerBadge } from '../components/followup.jsx'
+import { CallLink, Chips, Stat, WorkerBadge, departmentsOf } from '../components/followup.jsx'
 import { useContactDialogs } from '../components/useContactDialogs.jsx'
 import { useMe } from '../context/MeContext.jsx'
 import { useAppToast } from '../context/ToastContext.jsx'
@@ -28,6 +28,7 @@ export default function Membership({ contacts, outcomes, staff, refresh }) {
   const canLog = isDirector || me?.role === 'support'
   const dlg = useContactDialogs({ contacts, outcomes, staff, refresh })
   const [stage, setStage] = useState('ready')
+  const [dept, setDept] = useState('all')
   const [recording, setRecording] = useState(null)
   const [date, setDate] = useState(todayStr())
 
@@ -36,7 +37,9 @@ export default function Membership({ contacts, outcomes, staff, refresh }) {
   const counts = { open: 0, ready: 0, member: 0 }
   pipeline.forEach((c) => { counts[stageOf(c)]++ })
   const workers = pipeline.filter((c) => c.is_worker)
-  const rows = stage === 'workers' ? workers : pipeline.filter((c) => stageOf(c) === stage)
+  const departments = departmentsOf(workers)
+  const inDept = (c) => dept === 'all' || (dept === 'none' ? !c.worker_department : c.worker_department === dept)
+  const rows = stage === 'workers' ? workers.filter(inDept) : pipeline.filter((c) => stageOf(c) === stage)
 
   const record = async () => {
     const { error } = await supabase.from('people').update({ member_since: date }).eq('id', recording.id)
@@ -60,6 +63,12 @@ export default function Membership({ contacts, outcomes, staff, refresh }) {
       </div>
       <Card>
         <div className="mb-3"><Chips label="Filter by stage" value={stage} onChange={setStage} options={[['open', 'Window open'], ['ready', 'Ready for a decision'], ['member', 'Members'], ['workers', 'Workers']]} /></div>
+        {stage === 'workers' && (
+          <div className="mb-3">
+            <Chips label="Filter workers by department" value={dept} onChange={setDept}
+              options={[['all', 'All departments'], ...departments.map((d) => [d, `${d} (${workers.filter((c) => c.worker_department === d).length})`]), ...(workers.some((c) => !c.worker_department) ? [['none', 'No department yet']] : [])]} />
+          </div>
+        )}
         {rows.map((c) => {
           const s = stageOf(c)
           const left = WINDOW_DAYS - daysSince(c.completed_on)
@@ -76,6 +85,7 @@ export default function Membership({ contacts, outcomes, staff, refresh }) {
                   {c.hc_interest && <Badge variant="grey">House church</Badge>}
                 </div>
                 <div className="text-xs text-muted-sub mt-0.5">
+                  {stage === 'workers' && c.worker_department && <span className="font-semibold text-ink">{c.worker_department} · </span>}
                   {s === 'member' ? `Member since ${fmtDate(c.member_since)}${c.completed_on && c.steps_done === 4 ? ` · completed ${fmtDate(c.completed_on)}` : ''}`
                     : s === 'ready' ? `Completed ${fmtDate(c.completed_on)} · window passed ${-left} days ago · waiting on leadership`
                     : `Completed ${fmtDate(c.completed_on)} · ${left} days left in the window`}
