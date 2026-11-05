@@ -429,7 +429,8 @@ export function ContactPanel({ contact, outcomes = [], staff = [], departments =
           </Select>
         </Field>
       )}
-      {isDirector && <WorkerField c={c} departments={departments} onChanged={onChanged} />}
+      {/* Only members, or people who have finished all four steps, can be workers. */}
+      {isDirector && (c.member_since || c.steps_done === 4) && <WorkerField c={c} departments={departments} onChanged={onChanged} />}
       {c.prayer_request && (
         <div className="mt-4 bg-row-hover rounded-xl py-3.5 px-4">
           <div className="font-mono text-[9.5px] tracking-[.12em] uppercase text-muted-label font-semibold mb-1.5">Prayer request</div>
