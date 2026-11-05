@@ -231,7 +231,8 @@ export default function Membership({ contacts, outcomes, staff, refresh }) {
                     {deptsOf(c).map((d) => <Badge key={d} variant="grey">{d}</Badge>)}
                     {!c.member_since && <Badge variant="orange">Not a member</Badge>}
                   </> : <>
-                    <Badge variant={s === 'member' ? 'green' : s === 'ready' ? 'orange' : 'navy'}>{s === 'member' ? 'Member' : s === 'ready' ? 'Ready for a decision' : 'Window open'}</Badge>
+                    {/* The tab already says which stage they are at. */}
+                    {stage !== 'member' && <Badge variant={s === 'member' ? 'green' : s === 'ready' ? 'orange' : 'navy'}>{s === 'member' ? 'Member' : s === 'ready' ? 'Ready for a decision' : 'Window open'}</Badge>}
                     <WorkerBadge c={c} />
                   </>}
                   {c.hc_interest && <Badge variant="grey">House church</Badge>}
