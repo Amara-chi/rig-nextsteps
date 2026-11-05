@@ -4,7 +4,7 @@ import Card from '../components/Card.jsx'
 import Avatar from '../components/Avatar.jsx'
 import BtnSm from '../components/BtnSm.jsx'
 import EmptyState from '../components/EmptyState.jsx'
-import { AssigneeBadge, CallLink, Chips, ReasonBadge, SourceBadge, WorkerBadge, checkBadgeClass, whyLine } from '../components/followup.jsx'
+import { AssigneeBadge, CallLink, Chips, NeedsCheckBadge, ReasonBadge, SourceBadge, WorkerBadge, isMember, whyLine } from '../components/followup.jsx'
 import { useContactDialogs } from '../components/useContactDialogs.jsx'
 import { useMe } from '../context/MeContext.jsx'
 import { useAppToast } from '../context/ToastContext.jsx'
@@ -55,7 +55,7 @@ export default function Contacts({ contacts, outcomes, staff, refresh }) {
     if (status === 'mine') return c.assigned_to === me?.id && c.waiting
     if (status === 'waiting') return c.waiting
     if (status === 'contacted') return !!c.last_outcome_at
-    if (status === 'check') return !!c.needs_check
+    if (status === 'check') return !!c.needs_check && !isMember(c)
     if (status === 'unassigned') return !c.assigned_to && c.waiting
     return true
   })
@@ -99,17 +99,17 @@ export default function Contacts({ contacts, outcomes, staff, refresh }) {
                       <Avatar name={c.full_name} size={32} fontSize={11} />
                       <div>
                         <button type="button" onClick={() => dlg.openContact(c)} className="text-[13px] font-extrabold text-ink-deep text-left underline decoration-line underline-offset-3 hover:text-orange">{c.full_name}</button>
-                        <div className="flex gap-1.5 flex-wrap mt-1"><SourceBadge c={c} /><WorkerBadge c={c} />{c.needs_check && <span className={checkBadgeClass}>Needs a check</span>}</div>
+                        <div className="flex gap-1.5 flex-wrap mt-1"><SourceBadge c={c} /><WorkerBadge c={c} /><NeedsCheckBadge c={c} /></div>
                       </div>
                     </div>
                   </td>
                   <td className={td}>
                     <ReasonBadge c={c} />
                     <div className="text-xs text-muted-body mt-1 leading-snug max-w-80">{whyLine(c)}</div>
-                    {c.needs_check && <div className="text-[11.5px] text-amber-text mt-1 max-w-80">{c.needs_check}</div>}
+                    {c.needs_check && !isMember(c) && <div className="text-[11.5px] text-amber-text mt-1 max-w-80">{c.needs_check}</div>}
                   </td>
                   <td className={td + ' whitespace-nowrap'}>
-                    {isDirector ? (
+                    {isDirector && !isMember(c) ? (
                       <select
                         aria-label={`Assign ${c.full_name}`}
                         value={c.assigned_to || ''}

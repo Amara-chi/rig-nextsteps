@@ -31,6 +31,7 @@ export default function Membership({ contacts, outcomes, staff, refresh }) {
   const [dept, setDept] = useState('all')
   const [recording, setRecording] = useState(null)
   const [date, setDate] = useState(todayStr())
+  const [deleting, setDeleting] = useState(null)
 
   const pipeline = contacts.filter((c) => c.steps_done === 4 || c.member_since)
   const stageOf = (c) => (c.member_since ? 'member' : daysSince(c.completed_on) >= WINDOW_DAYS ? 'ready' : 'open')
@@ -95,6 +96,7 @@ export default function Membership({ contacts, outcomes, staff, refresh }) {
               <div className="flex gap-1.5">
                 {canLog && <BtnSm variant="outline" onClick={() => dlg.logOutcome(c)}>Log a call</BtnSm>}
                 {isDirector && s === 'ready' && <BtnSm onClick={() => { setDate(todayStr()); setRecording(c) }}>Record membership</BtnSm>}
+                {isDirector && s === 'member' && <BtnSm variant="outline" className="border-[#E8B4A6]! text-orange-deep!" onClick={() => setDeleting(c)}>Delete</BtnSm>}
               </div>
             </div>
           )
@@ -112,6 +114,21 @@ export default function Membership({ contacts, outcomes, staff, refresh }) {
         onSave={record}
       >
         <Field label="Member since" htmlFor="ms-date"><TextInput id="ms-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} /></Field>
+      </Modal>
+      <Modal
+        open={!!deleting}
+        title="Delete this member?"
+        sub={deleting?.full_name}
+        saveLabel="Yes, delete"
+        onClose={() => setDeleting(null)}
+        onSave={async () => {
+          const { error } = await supabase.from('people').delete().eq('id', deleting.id)
+          if (error) { toast(`Couldn't delete that: ${error.message}`); return false }
+          toast(`${deleting.full_name} deleted.`)
+          refresh()
+        }}
+      >
+        <p className="text-[13px] text-muted-body mt-3">This removes {deleting?.full_name} from the platform permanently, with their notes, outcomes and any check-ins. It cannot be undone.</p>
       </Modal>
       {dlg.dialogs}
     </>

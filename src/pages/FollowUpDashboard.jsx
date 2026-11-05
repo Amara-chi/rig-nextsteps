@@ -5,7 +5,7 @@ import Avatar from '../components/Avatar.jsx'
 import Badge from '../components/Badge.jsx'
 import BtnSm from '../components/BtnSm.jsx'
 import EmptyState from '../components/EmptyState.jsx'
-import { AssigneeBadge, CallLink, ReasonBadge, SourceBadge, Stat, WorkerBadge, checkBadgeClass, whyLine } from '../components/followup.jsx'
+import { AssigneeBadge, CallLink, NeedsCheckBadge, ReasonBadge, SourceBadge, Stat, WorkerBadge, whyLine } from '../components/followup.jsx'
 import { useContactDialogs } from '../components/useContactDialogs.jsx'
 import { useMe } from '../context/MeContext.jsx'
 import { fmtDate, fmtWhen, telHref, fmtPhone } from '../lib/format.js'
@@ -84,7 +84,7 @@ export default function FollowUpDashboard({ contacts, outcomes, staff, refresh, 
                 <div className="flex-1 min-w-50">
                   <div className="text-[13px] font-extrabold text-ink-deep flex items-center gap-1.5 flex-wrap">
                     <button type="button" onClick={() => dlg.openContact(c)} className="underline decoration-line underline-offset-3 hover:text-orange">{c.full_name}</button>
-                    <SourceBadge c={c} /><ReasonBadge c={c} /><WorkerBadge c={c} />{c.needs_check && <span className={checkBadgeClass}>Needs a check</span>}<AssigneeBadge c={c} me={me} />
+                    <SourceBadge c={c} /><ReasonBadge c={c} /><WorkerBadge c={c} /><NeedsCheckBadge c={c} /><AssigneeBadge c={c} me={me} />
                   </div>
                   <div className="text-xs text-muted-sub mt-0.5 leading-normal">{whyLine(c)}</div>
                   {c.prayer_request && <div className="text-xs text-ink mt-1 leading-normal"><span className="font-mono text-[9.5px] tracking-[.1em] uppercase text-muted-label font-semibold mr-1.5">Prayer request</span>{c.prayer_request}</div>}

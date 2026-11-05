@@ -102,7 +102,16 @@ export function CallLink({ phone, className = '' }) {
   )
 }
 
+// Members are not call targets: no "needs a check" flag and no caller to
+// assign, so neither shows for them anywhere in Follow Up.
+export const isMember = (c) => !!c.member_since
+
+export function NeedsCheckBadge({ c }) {
+  return c.needs_check && !isMember(c) ? <span className={checkBadgeClass}>Needs a check</span> : null
+}
+
 export function AssigneeBadge({ c, me }) {
+  if (isMember(c)) return null
   if (!c.assigned_to) return <span className="inline-flex px-2.5 py-0.75 rounded-full text-[10.5px] font-bold border-[1.5px] border-dashed border-line text-muted-label">Nobody yet</span>
   if (c.assigned_to === me?.id) return <Badge variant="orange">Mine</Badge>
   return <Badge variant="grey">{(c.assigned_name || '').split(' ')[0] || 'Assigned'}</Badge>
@@ -378,22 +387,22 @@ export function ContactPanel({ contact, outcomes = [], staff = [], departments =
       open
       onClose={onClose}
       title={<span className="flex items-center gap-3"><Avatar name={c.full_name} size={40} fontSize={13} />{c.full_name}</span>}
-      sub={<span className="flex gap-1.5 flex-wrap mt-1"><SourceBadge c={c} /><ReasonBadge c={c} /><WorkerBadge c={c} />{c.needs_check && <span className={checkBadgeClass}>Needs a check</span>}<AssigneeBadge c={c} me={me} /></span>}
+      sub={<span className="flex gap-1.5 flex-wrap mt-1"><SourceBadge c={c} /><ReasonBadge c={c} /><WorkerBadge c={c} /><NeedsCheckBadge c={c} /><AssigneeBadge c={c} me={me} /></span>}
       footer={<>
         {canAct && <BtnSm variant="outline" onClick={() => onEdit?.(c)}>Edit details</BtnSm>}
-        {canAct && !c.assigned_to && <BtnSm variant="outline" onClick={take}>Take it</BtnSm>}
+        {canAct && !c.assigned_to && !isMember(c) && <BtnSm variant="outline" onClick={take}>Take it</BtnSm>}
         {c.phone && <a href={telHref(c.phone)} className="inline-flex items-center gap-1.5 px-4 py-2.25 rounded-[10px] font-bold text-[12.5px] whitespace-nowrap bg-white border-[1.5px] border-line text-ink hover:border-orange hover:text-orange no-underline">Call {fmtPhone(c.phone)}</a>}
         {canAct && <BtnSm onClick={() => onLog?.(c)}>Log outcome</BtnSm>}
       </>}
     >
-      {c.needs_check && <div className="mb-4 bg-amber-bg border border-amber-border text-amber-text rounded-xl py-3 px-3.5 text-[13px] leading-normal"><strong>Needs a check.</strong> {c.needs_check}</div>}
+      {c.needs_check && !isMember(c) && <div className="mb-4 bg-amber-bg border border-amber-border text-amber-text rounded-xl py-3 px-3.5 text-[13px] leading-normal"><strong>Needs a check.</strong> {c.needs_check}</div>}
       <p className="text-[13px] text-muted-body leading-normal mb-4">{whyLine(c)}</p>
       <dl className="grid gap-x-4.5 gap-y-3 grid-cols-2 max-mobile:grid-cols-1">
         {fields.map(([k, v]) => (
           <div key={k}><dt className="text-[11px] text-muted-label font-semibold">{k}</dt><dd className="text-[13.5px] text-ink-deep leading-snug">{v}</dd></div>
         ))}
       </dl>
-      {isDirector && (
+      {isDirector && !isMember(c) && (
         <Field label="Assigned to" htmlFor="cp-assign">
           <Select id="cp-assign" value={c.assigned_to || ''} onChange={assign}>
             <option value="">Nobody yet</option>
