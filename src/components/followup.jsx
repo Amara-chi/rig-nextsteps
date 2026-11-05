@@ -250,7 +250,7 @@ export function DeleteOutcomeDialog({ outcome, onClose, onDeleted }) {
 }
 
 // ---------- Add (or edit) a contact ----------
-const blankContact = { full_name: '', phone: '', email: '', source: 'welcome_card', group_name: '', gender: '', birth_day: '', birth_month: '', birth_year: '', age_range: '', address: '', occupation: '', referral: '', prayer_request: '', first_visit: '', needs_check: '', assigned_to: '' }
+const blankContact = { member_since: '', full_name: '', phone: '', email: '', source: 'welcome_card', group_name: '', gender: '', birth_day: '', birth_month: '', birth_year: '', age_range: '', address: '', occupation: '', referral: '', prayer_request: '', first_visit: '', needs_check: '', assigned_to: '' }
 
 export function ContactFormDialog({ open, contact, staff = [], onClose, onSaved }) {
   const me = useMe()
@@ -278,10 +278,19 @@ export function ContactFormDialog({ open, contact, staff = [], onClose, onSaved 
     setSaving(true)
     const payload = { ...f }
     if (editing) {
-      ;['source', 'group_name', 'first_visit', 'assigned_to'].forEach((k) => delete payload[k])
+      ;['source', 'group_name', 'first_visit', 'assigned_to', 'member_since'].forEach((k) => delete payload[k])
       const { data, error } = await supabase.rpc('update_contact', { p_id: contact.id, p: payload })
+      if (error || data?.ok === false) { setSaving(false); toast(data?.error === 'phone_taken' ? 'That phone number belongs to someone else on file.' : "Couldn't save that. Check your access."); return }
+      // The fields update_contact leaves alone are the admin's to correct
+      // directly (people is director-write in RLS).
+      if (isDirector) {
+        const { error: e2 } = await supabase.from('people').update({
+          source: f.source || contact.source, group_name: f.source === 'group' ? f.group_name.trim() || null : null,
+          first_visit: f.first_visit || null, member_since: f.member_since || null,
+        }).eq('id', contact.id)
+        if (e2) { setSaving(false); toast(`Details saved, but not where they came from: ${e2.message}`); onSaved?.(); return }
+      }
       setSaving(false)
-      if (error || data?.ok === false) { toast(data?.error === 'phone_taken' ? 'That phone number belongs to someone else on file.' : "Couldn't save that. Check your access."); return }
       toast('Details saved.')
     } else {
       const { data, error } = await supabase.rpc('add_contact', { p: payload })
@@ -305,20 +314,20 @@ export function ContactFormDialog({ open, contact, staff = [], onClose, onSaved 
         <BtnSm disabled={saving} onClick={save}>{saving ? 'Saving…' : editing ? 'Save details' : 'Save contact'}</BtnSm>
       </>}
     >
-      {!editing && (
-        <div className="flex gap-1.5 flex-wrap" role="group" aria-label="Where this contact came from">
-          {[['welcome_card', 'Welcome card'], ['group', 'Group list'], ['referral', 'Referred by a member']].map(([k, l]) => (
+      {(!editing || isDirector) && (
+        <div className={`flex gap-1.5 flex-wrap ${editing ? 'mb-4' : ''}`} role="group" aria-label="Where this contact came from">
+          {[...(editing && contact.source === 'next_steps' ? [['next_steps', 'Next Steps']] : []), ['welcome_card', 'Welcome card'], ['group', 'Group list'], ['referral', 'Referred by a member']].map(([k, l]) => (
             <button key={k} type="button" aria-pressed={f.source === k} onClick={() => setF((x) => ({ ...x, source: k }))}
               className={`min-h-9 px-3.5 rounded-full text-xs font-bold border-[1.5px] ${f.source === k ? 'bg-ink-deep border-ink-deep text-white' : 'bg-white border-line text-ink'}`}>{l}</button>
           ))}
         </div>
       )}
-      <Field label="Full name" htmlFor="cf-name" className={editing ? 'mt-0!' : ''}><TextInput id="cf-name" value={f.full_name} onChange={set('full_name')} /></Field>
-      {!editing && f.source === 'group' && <Field label="Which list?" htmlFor="cf-group"><TextInput id="cf-group" value={f.group_name} onChange={set('group_name')} placeholder="e.g. Law school" /></Field>}
+      <Field label="Full name" htmlFor="cf-name" className={editing && !isDirector ? 'mt-0!' : ''}><TextInput id="cf-name" value={f.full_name} onChange={set('full_name')} /></Field>
+      {(!editing || isDirector) && f.source === 'group' && <Field label="Which list?" htmlFor="cf-group"><TextInput id="cf-group" value={f.group_name} onChange={set('group_name')} placeholder="e.g. Law school" /></Field>}
       <div className={g}>
         <Field label="Phone" htmlFor="cf-phone"><TextInput id="cf-phone" type="tel" value={f.phone} onChange={set('phone')} placeholder="0803 000 0000 or +44…" /></Field>
         <Field label="Email" htmlFor="cf-email"><TextInput id="cf-email" type="email" value={f.email} onChange={set('email')} /></Field>
-        {!editing && <Field label="Date of visit" htmlFor="cf-visit"><TextInput id="cf-visit" type="date" value={f.first_visit} onChange={set('first_visit')} /></Field>}
+        {(!editing || isDirector) && <Field label={editing ? 'First visit' : 'Date of visit'} htmlFor="cf-visit"><TextInput id="cf-visit" type="date" value={f.first_visit} onChange={set('first_visit')} /></Field>}
         <Field label="Gender" htmlFor="cf-gender"><Select id="cf-gender" value={f.gender} onChange={set('gender')}><option value="">Not given</option><option value="F">Female</option><option value="M">Male</option></Select></Field>
         <Field label="Birthday" htmlFor="cf-bday">
           <div className="flex gap-2">
@@ -328,6 +337,9 @@ export function ContactFormDialog({ open, contact, staff = [], onClose, onSaved 
         </Field>
         <Field label="Age range" htmlFor="cf-age"><Select id="cf-age" value={f.age_range} onChange={set('age_range')}><option value="">Not given</option>{AGE_RANGES.map((a) => <option key={a}>{a}</option>)}</Select></Field>
         <Field label="Occupation" htmlFor="cf-occ"><TextInput id="cf-occ" value={f.occupation} onChange={set('occupation')} /></Field>
+        {editing && isDirector && (contact.member_since || contact.steps_done === 4) && (
+          <Field label={<>Member since <span className="font-medium text-muted-label">(empty = not a member)</span></>} htmlFor="cf-member"><TextInput id="cf-member" type="date" value={f.member_since} onChange={set('member_since')} /></Field>
+        )}
       </div>
       <Field label="Address or area" htmlFor="cf-addr"><TextInput id="cf-addr" value={f.address} onChange={set('address')} placeholder="e.g. Lekki Phase 1" /></Field>
       <Field label="Who invited them, or how they heard" htmlFor="cf-ref"><TextInput id="cf-ref" value={f.referral} onChange={set('referral')} placeholder="e.g. A friend, YouTube" /></Field>
@@ -348,9 +360,14 @@ export function ContactFormDialog({ open, contact, staff = [], onClose, onSaved 
 }
 
 // ---------- The contact panel: the whole record in one place ----------
-export function ContactPanel({ contact, outcomes = [], staff = [], departments = [], onClose, onChanged, onLog, onEdit, onEditOutcome, onDeleteOutcome }) {
+export function ContactPanel({ contact, outcomes = [], staff = [], departments = [], focusNote = false, onClose, onChanged, onLog, onEdit, onDelete, onEditOutcome, onDeleteOutcome }) {
   const me = useMe()
   const toast = useAppToast()
+  // "Add a note" opens the panel with the note box ready to type in.
+  useEffect(() => {
+    if (focusNote && contact) setTimeout(() => document.getElementById('cp-note-input')?.focus(), 50)
+  }, [focusNote, contact?.id])
+  const focusNoteBox = () => document.getElementById('cp-note-input')?.focus()
   const isDirector = me?.role === 'director'
   const canAct = isDirector || me?.role === 'support'
   if (!contact) return null
@@ -379,6 +396,7 @@ export function ContactPanel({ contact, outcomes = [], staff = [], departments =
     ['Address or area', c.address || 'Not given'],
     ['Occupation', c.occupation || 'Not given'],
     ['Invited by or heard through', c.referral || 'Not given'],
+    ...(c.member_since ? [['Member since', fmtDate(c.member_since)]] : []),
     ['Next Steps', c.steps_done ? `${c.steps_done} of 4 steps · last seen ${fmtDate(c.last_seen)}` : 'Not started'],
   ]
 
@@ -389,10 +407,11 @@ export function ContactPanel({ contact, outcomes = [], staff = [], departments =
       title={<span className="flex items-center gap-3"><Avatar name={c.full_name} size={40} fontSize={13} />{c.full_name}</span>}
       sub={<span className="flex gap-1.5 flex-wrap mt-1"><SourceBadge c={c} /><ReasonBadge c={c} /><WorkerBadge c={c} /><NeedsCheckBadge c={c} /><AssigneeBadge c={c} me={me} /></span>}
       footer={<>
+        {isDirector && <BtnSm variant="outline" className="border-[#E8B4A6]! text-orange-deep! mr-auto" onClick={() => onDelete?.(c)}>Delete</BtnSm>}
         {canAct && <BtnSm variant="outline" onClick={() => onEdit?.(c)}>Edit details</BtnSm>}
         {canAct && !c.assigned_to && !isMember(c) && <BtnSm variant="outline" onClick={take}>Take it</BtnSm>}
         {c.phone && <a href={telHref(c.phone)} className="inline-flex items-center gap-1.5 px-4 py-2.25 rounded-[10px] font-bold text-[12.5px] whitespace-nowrap bg-white border-[1.5px] border-line text-ink hover:border-orange hover:text-orange no-underline">Call {fmtPhone(c.phone)}</a>}
-        {canAct && <BtnSm onClick={() => onLog?.(c)}>Log outcome</BtnSm>}
+        {c.is_worker ? <BtnSm onClick={focusNoteBox}>Add a note</BtnSm> : canAct && <BtnSm onClick={() => onLog?.(c)}>Log outcome</BtnSm>}
       </>}
     >
       {c.needs_check && !isMember(c) && <div className="mb-4 bg-amber-bg border border-amber-border text-amber-text rounded-xl py-3 px-3.5 text-[13px] leading-normal"><strong>Needs a check.</strong> {c.needs_check}</div>}
@@ -435,7 +454,7 @@ export function ContactPanel({ contact, outcomes = [], staff = [], departments =
           </div>
         )) : <div className="text-[13px] text-muted-faint py-2.5">Nothing logged yet.</div>}
       </div>
-      <NotesThread personId={c.id} className="mt-4" />
+      <NotesThread personId={c.id} className="mt-4" inputId="cp-note-input" />
     </Dialog>
   )
 }

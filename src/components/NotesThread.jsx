@@ -58,7 +58,8 @@ function NoteItem({ note, canManage, onChanged }) {
 // fu-item layout used an inline override to 10px (mt-2.5) instead. showLabel
 // is false on the Support pages too — their notes-wrap never had the "nk"
 // header, unlike the People pane's person-detail usage.
-export default function NotesThread({ personId, className = 'mt-4', showLabel = true }) {
+// inputId lets a parent focus the note box (the contact panel's "Add a note").
+export default function NotesThread({ personId, className = 'mt-4', showLabel = true, inputId }) {
   const me = useMe()
   const toast = useAppToast()
   const [notes, setNotes] = useState(null)
@@ -98,6 +99,7 @@ export default function NotesThread({ personId, className = 'mt-4', showLabel = 
       )}
       <div className="flex gap-2 mt-1">
         <input
+          id={inputId}
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') addNote() }}
