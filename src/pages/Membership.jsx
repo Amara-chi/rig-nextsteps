@@ -5,16 +5,16 @@ import Badge from '../components/Badge.jsx'
 import BtnSm from '../components/BtnSm.jsx'
 import Modal from '../components/Modal.jsx'
 import Dialog from '../components/Dialog.jsx'
-import Field, { TextInput } from '../components/Field.jsx'
+import Field, { Select, TextInput } from '../components/Field.jsx'
 import EmptyState from '../components/EmptyState.jsx'
-import { CallLink, Chips, Stat, WorkerBadge, departmentsOf } from '../components/followup.jsx'
+import { CallLink, Chips, DepartmentsInput, Stat, WorkerBadge, departmentsOf, deptsOf } from '../components/followup.jsx'
 import { useContactDialogs } from '../components/useContactDialogs.jsx'
 import { useMe } from '../context/MeContext.jsx'
 import { useAppToast } from '../context/ToastContext.jsx'
 import { supabase } from '../lib/supabaseClient.js'
 import { fmtDate, todayStr } from '../lib/format.js'
 
-const blankMember = { full_name: '', phone: '', email: '', member_since: '', worker: false, title: '', department: '' }
+const blankMember = { full_name: '', phone: '', email: '', member_since: '', worker: false, title: '', departments: [] }
 
 // The admin adds someone who is already a member (and maybe a worker) but
 // never came through Next Steps or a card. Created through add_contact, so
@@ -37,7 +37,7 @@ function AddMemberDialog({ open, departments, onClose, onSaved }) {
     if (error || data?.ok === false) { setSaving(false); toast("Couldn't add them. Check the name and phone or email."); return }
     const { error: e2 } = await supabase.from('people').update({
       member_since: f.member_since || todayStr(), is_worker: f.worker,
-      worker_title: f.worker ? f.title.trim() || null : null, worker_department: f.worker ? f.department.trim() || null : null,
+      worker_title: f.worker ? f.title.trim() || null : null, worker_departments: f.worker ? f.departments : [],
     }).eq('id', data.id)
     setSaving(false)
     if (e2) { toast(`Added, but not as a member: ${e2.message}`); onSaved(); return }
@@ -74,8 +74,7 @@ function AddMemberDialog({ open, departments, onClose, onSaved }) {
         <div className={g}>
           <Field label="Title (optional)" htmlFor="am-title"><TextInput id="am-title" value={f.title} onChange={set('title')} placeholder="e.g. Prophetic Lead" /></Field>
           <Field label="Department (optional)" htmlFor="am-dept">
-            <TextInput id="am-dept" list="am-depts" value={f.department} onChange={set('department')} />
-            <datalist id="am-depts">{departments.map((d) => <option key={d} value={d} />)}</datalist>
+            <DepartmentsInput id="am-dept" value={f.departments} onChange={(v) => setF((x) => ({ ...x, departments: v }))} options={departments} />
           </Field>
         </div>
       )}
@@ -104,7 +103,7 @@ export default function Membership({ contacts, outcomes, staff, refresh }) {
   const [adding, setAdding] = useState(false)
   // Bulk actions (admin only): ticked rows, and which bulk dialog is open.
   const [picked, setPicked] = useState(() => new Set())
-  const [bulk, setBulk] = useState(null) // 'record' | 'dept' | 'delete'
+  const [bulk, setBulk] = useState(null) // 'record' | 'add-dept' | 'remove-dept' | 'delete'
   const [bulkDept, setBulkDept] = useState('')
   const setStage = (v) => { setStageRaw(v); setPicked(new Set()) }
   const setDept = (v) => { setDeptRaw(v); setPicked(new Set()) }
@@ -115,7 +114,7 @@ export default function Membership({ contacts, outcomes, staff, refresh }) {
   pipeline.forEach((c) => { counts[stageOf(c)]++ })
   const workers = pipeline.filter((c) => c.is_worker)
   const departments = departmentsOf(workers)
-  const inDept = (c) => dept === 'all' || (dept === 'none' ? !c.worker_department : c.worker_department === dept)
+  const inDept = (c) => dept === 'all' || (dept === 'none' ? !deptsOf(c).length : deptsOf(c).includes(dept))
   const rows = stage === 'workers' ? workers.filter(inDept) : pipeline.filter((c) => stageOf(c) === stage)
 
   const record = async () => {
@@ -142,7 +141,20 @@ export default function Membership({ contacts, outcomes, staff, refresh }) {
   }
   const bulkSave = async () => {
     if (bulk === 'record') return bulkUpdate({ member_since: date }, `${people(n)} recorded as members from ${fmtDate(date)}.`)
-    if (bulk === 'dept') return bulkUpdate({ worker_department: bulkDept.trim() || null }, bulkDept.trim() ? `${people(n)} moved to ${bulkDept.trim()}.` : `Department cleared for ${people(n)}.`)
+    if (bulk === 'add-dept' || bulk === 'remove-dept') {
+      // Departments are a list per person, so each row gets its own new list.
+      const d = bulkDept.trim()
+      if (!d) { toast('Pick a department.'); return false }
+      const adding = bulk === 'add-dept'
+      const results = await Promise.all(chosen.map((c) => {
+        const now = deptsOf(c)
+        const next = adding ? (now.some((x) => x.toLowerCase() === d.toLowerCase()) ? now : [...now, d]) : now.filter((x) => x !== d)
+        return supabase.from('people').update({ worker_departments: next }).eq('id', c.id)
+      }))
+      const failed = results.filter((r) => r.error).length
+      if (failed) { toast(`${failed} of ${n} could not be updated.`); refresh(); return false }
+      toast(adding ? `${people(n)} added to ${d}.` : `${people(n)} taken out of ${d}.`); setPicked(new Set()); refresh(); return
+    }
     if (bulk === 'delete') {
       const { error } = await supabase.from('people').delete().in('id', ids)
       if (error) { toast(`Couldn't delete them: ${error.message}`); return false }
@@ -169,7 +181,7 @@ export default function Membership({ contacts, outcomes, staff, refresh }) {
         {stage === 'workers' && (
           <div className="mb-3">
             <Chips label="Filter workers by department" value={dept} onChange={setDept}
-              options={[['all', 'All departments'], ...departments.map((d) => [d, `${d} (${workers.filter((c) => c.worker_department === d).length})`]), ...(workers.some((c) => !c.worker_department) ? [['none', 'No department yet']] : [])]} />
+              options={[['all', 'All departments'], ...departments.map((d) => [d, `${d} (${workers.filter((c) => deptsOf(c).includes(d)).length})`]), ...(workers.some((c) => !deptsOf(c).length) ? [['none', 'No department yet']] : [])]} />
           </div>
         )}
         {isDirector && rows.length > 0 && (
@@ -181,8 +193,11 @@ export default function Membership({ contacts, outcomes, staff, refresh }) {
             {n > 0 && <>
               {stage === 'ready' && <BtnSm onClick={() => { setDate(todayStr()); setBulk('record') }}>Record membership</BtnSm>}
               {stage === 'member' && chosen.some((c) => !c.is_worker) && <BtnSm variant="outline" onClick={() => bulkUpdate({ is_worker: true }, `${people(chosen.filter((c) => !c.is_worker).length)} tagged as workers.`)}>Make workers</BtnSm>}
-              {(stage === 'workers' || chosen.every((c) => c.is_worker)) && stage !== 'ready' && stage !== 'open' && <BtnSm variant="outline" onClick={() => { setBulkDept(''); setBulk('dept') }}>Set department</BtnSm>}
-              {stage === 'workers' && <BtnSm variant="outline" onClick={() => bulkUpdate({ is_worker: false, worker_title: null, worker_department: null }, `${people(n)} removed from workers.`)}>Remove from workers</BtnSm>}
+              {(stage === 'workers' || chosen.every((c) => c.is_worker)) && stage !== 'ready' && stage !== 'open' && <>
+                <BtnSm variant="outline" onClick={() => { setBulkDept(''); setBulk('add-dept') }}>Add to department</BtnSm>
+                {chosen.some((c) => deptsOf(c).length) && <BtnSm variant="outline" onClick={() => { setBulkDept(''); setBulk('remove-dept') }}>Remove from department</BtnSm>}
+              </>}
+              {stage === 'workers' && <BtnSm variant="outline" onClick={() => bulkUpdate({ is_worker: false, worker_title: null, worker_departments: [] }, `${people(n)} removed from workers.`)}>Remove from workers</BtnSm>}
               <BtnSm variant="outline" className="border-[#E8B4A6]! text-orange-deep!" onClick={() => setBulk('delete')}>Delete</BtnSm>
               <button type="button" onClick={() => setPicked(new Set())} className="text-xs font-bold text-muted-sub underline ml-auto">Clear</button>
             </>}
@@ -206,7 +221,7 @@ export default function Membership({ contacts, outcomes, staff, refresh }) {
                   {c.hc_interest && <Badge variant="grey">House church</Badge>}
                 </div>
                 <div className="text-xs text-muted-sub mt-0.5">
-                  {stage === 'workers' && c.worker_department && <span className="font-semibold text-ink">{c.worker_department} · </span>}
+                  {c.is_worker && deptsOf(c).length > 0 && <span className="font-semibold text-ink">{deptsOf(c).join(', ')} · </span>}
                   {s === 'member' ? `Member since ${fmtDate(c.member_since)}${c.completed_on && c.steps_done === 4 ? ` · completed ${fmtDate(c.completed_on)}` : ''}`
                     : s === 'ready' ? `Completed ${fmtDate(c.completed_on)} · window passed ${-left} days ago · waiting on leadership`
                     : `Completed ${fmtDate(c.completed_on)} · ${left} days left in the window`}
@@ -238,17 +253,25 @@ export default function Membership({ contacts, outcomes, staff, refresh }) {
       </Modal>
       <Modal
         open={!!bulk}
-        title={bulk === 'record' ? `Record membership for ${people(n)}` : bulk === 'dept' ? `Set department for ${people(n)}` : `Delete ${people(n)}?`}
+        title={bulk === 'record' ? `Record membership for ${people(n)}` : bulk === 'add-dept' ? `Add ${people(n)} to a department` : bulk === 'remove-dept' ? `Take ${people(n)} out of a department` : `Delete ${people(n)}?`}
         sub={bulk === 'record' ? 'Only after leadership has decided. This writes the date on each record; it does not make the decision.' : chosen.map((c) => c.full_name).join(', ')}
         saveLabel={bulk === 'delete' ? 'Yes, delete' : bulk === 'record' ? 'Record it' : 'Save'}
         onClose={() => setBulk(null)}
         onSave={bulkSave}
       >
         {bulk === 'record' && <Field label="Member since" htmlFor="bk-date"><TextInput id="bk-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} /></Field>}
-        {bulk === 'dept' && (
-          <Field label={<>Department <span className="font-medium text-muted-label">(empty = no department)</span></>} htmlFor="bk-dept">
+        {bulk === 'add-dept' && (
+          <Field label={<>Department <span className="font-medium text-muted-label">(added to the ones they already have)</span></>} htmlFor="bk-dept">
             <TextInput id="bk-dept" list="bk-depts" value={bulkDept} onChange={(e) => setBulkDept(e.target.value)} />
             <datalist id="bk-depts">{departments.map((d) => <option key={d} value={d} />)}</datalist>
+          </Field>
+        )}
+        {bulk === 'remove-dept' && (
+          <Field label="Department" htmlFor="bk-dept-out">
+            <Select id="bk-dept-out" value={bulkDept} onChange={(e) => setBulkDept(e.target.value)}>
+              <option value="">Choose…</option>
+              {[...new Set(chosen.flatMap(deptsOf))].sort((a, b) => a.localeCompare(b)).map((d) => <option key={d} value={d}>{d}</option>)}
+            </Select>
           </Field>
         )}
         {bulk === 'delete' && <p className="text-[13px] text-muted-body mt-3">This removes them from the platform permanently, with their notes, outcomes and any check-ins. It cannot be undone.</p>}

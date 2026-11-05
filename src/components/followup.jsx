@@ -50,24 +50,62 @@ export function WorkerBadge({ c }) {
 
 // Every department already in use, for the department suggestions and the
 // Membership filter, so the same name is not typed three different ways.
-export const departmentsOf = (contacts) =>
-  [...new Set(contacts.map((c) => (c.is_worker && c.worker_department) || '').filter(Boolean))].sort((a, b) => a.localeCompare(b))
+// A worker's departments, any number of them (v20).
+export const deptsOf = (c) => c.worker_departments || []
 
-// The admin tags a worker and sets an optional title and department, in the
-// contact panel. Admin only, like recording membership (people is
+export const departmentsOf = (contacts) =>
+  [...new Set(contacts.filter((c) => c.is_worker).flatMap(deptsOf))].sort((a, b) => a.localeCompare(b))
+
+// Departments as removable chips plus a box to add another (Enter, comma or
+// the Add button; whatever is still typed is added when the box loses focus).
+export function DepartmentsInput({ id, value, onChange, options = [] }) {
+  const [text, setText] = useState('')
+  const add = () => {
+    const names = text.split(',').map((s) => s.trim()).filter(Boolean)
+    const next = [...value]
+    names.forEach((d) => { if (!next.some((x) => x.toLowerCase() === d.toLowerCase())) next.push(d) })
+    if (next.length !== value.length) onChange(next)
+    setText('')
+  }
+  return (
+    <div>
+      {value.length > 0 && (
+        <div className="flex gap-1.5 flex-wrap mb-2">
+          {value.map((d) => (
+            <span key={d} className="inline-flex items-center gap-1 pl-2.5 pr-1 py-0.75 rounded-full text-[11.5px] font-bold bg-cream-deep text-ink-deep">
+              {d}
+              <button type="button" aria-label={`Remove ${d}`} onClick={() => onChange(value.filter((x) => x !== d))} className="w-5 h-5 grid place-items-center rounded-full text-muted-sub hover:text-orange-deep">×</button>
+            </span>
+          ))}
+        </div>
+      )}
+      <div className="flex gap-2">
+        <TextInput id={id} list={`${id}-list`} value={text} onChange={(e) => setText(e.target.value)} onBlur={add}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); add() } }}
+          placeholder={value.length ? 'Add another department' : 'Department'} aria-label="Add a department" />
+        <BtnSm variant="outline" onClick={add}>Add</BtnSm>
+      </div>
+      <datalist id={`${id}-list`}>{options.filter((d) => !value.includes(d)).map((d) => <option key={d} value={d} />)}</datalist>
+    </div>
+  )
+}
+
+// The admin tags a worker and sets an optional title and departments, in
+// the contact panel. Admin only, like recording membership (people is
 // director-write in RLS).
 function WorkerField({ c, departments = [], onChanged }) {
   const toast = useAppToast()
   const [worker, setWorker] = useState(!!c.is_worker)
   const [title, setTitle] = useState(c.worker_title || '')
-  const [dept, setDept] = useState(c.worker_department || '')
+  const [depts, setDepts] = useState(deptsOf(c))
   const [saving, setSaving] = useState(false)
-  useEffect(() => { setWorker(!!c.is_worker); setTitle(c.worker_title || ''); setDept(c.worker_department || '') }, [c.id, c.is_worker, c.worker_title, c.worker_department])
-  const changed = worker !== !!c.is_worker || title.trim() !== (c.worker_title || '') || dept.trim() !== (c.worker_department || '')
+  const deptKey = deptsOf(c).join('|')
+  useEffect(() => { setWorker(!!c.is_worker); setTitle(c.worker_title || ''); setDepts(deptsOf(c)) }, [c.id, c.is_worker, c.worker_title, deptKey])
+  const changed = worker !== !!c.is_worker || title.trim() !== (c.worker_title || '') || depts.join('|') !== deptKey
 
   const save = async () => {
     setSaving(true)
-    const { error } = await supabase.from('people').update({ is_worker: worker, worker_title: worker ? title.trim() || null : null, worker_department: worker ? dept.trim() || null : null }).eq('id', c.id)
+    const { error } = await supabase.from('people').update({ is_worker: worker, worker_title: worker ? title.trim() || null : null, worker_departments: worker ? depts : [] }).eq('id', c.id)
     setSaving(false)
     if (error) { toast(`Couldn't save that: ${error.message}`); return }
     toast(worker ? `${c.full_name} is tagged as a worker.` : `${c.full_name} is no longer tagged as a worker.`)
@@ -81,10 +119,9 @@ function WorkerField({ c, departments = [], onChanged }) {
         Serves as a worker
       </label>
       {worker && (
-        <div className="grid gap-2 grid-cols-2 max-mobile:grid-cols-1">
+        <div className="grid gap-2">
           <TextInput id="cp-worker-title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title, if they have one" aria-label="Title" />
-          <TextInput id="cp-worker-dept" list="cp-worker-depts" value={dept} onChange={(e) => setDept(e.target.value)} placeholder="Department" aria-label="Department" />
-          <datalist id="cp-worker-depts">{departments.map((d) => <option key={d} value={d} />)}</datalist>
+          <DepartmentsInput id="cp-worker-dept" value={depts} onChange={setDepts} options={departments} />
         </div>
       )}
       {changed && <BtnSm className="mt-2" disabled={saving} onClick={save}>{saving ? 'Saving…' : 'Save'}</BtnSm>}
