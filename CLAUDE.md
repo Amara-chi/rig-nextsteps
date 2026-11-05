@@ -112,9 +112,12 @@ there is the reference for the sidebar and Follow Up pages, `TodayN.dc.html` for
 - `supabase/migrations/` — same content split for `supabase db push` workflows
 - `supabase/import-history.sql` — one-time historical data load (27 people, Mar–Jul 2026);
   idempotent; run AFTER the schema
+- `supabase/import-workers-2026-11.sql` — one-time, idempotent (matches by email): the 23
+  members and workers from the 5 Nov 2026 mailing-list export. Run after v18. Their
+  `member_since` is the mailing-list subscription date, flagged in `needs_check` as unconfirmed.
 - `supabase/seed-bible-study.sql` — optional, idempotent: the Seven Churches series (8 sessions,
   Jul to Sep 2026) as written up on the design canvas. Run after v15.
-- `supabase/upgrade-v3.sql` through `upgrade-v17.sql` — only for databases created from older
+- `supabase/upgrade-v3.sql` through `upgrade-v18.sql` — only for databases created from older
   schema versions; NOT needed on fresh installs
 - `supabase/templates/` — the branded auth emails GoTrue sends: `reset-password.html`
   (forgot-password link) and `invite.html` (new staff member's first sign in). Same shell as
@@ -204,6 +207,11 @@ there is the reference for the sidebar and Follow Up pages, `TodayN.dc.html` for
   (today by default, never the future); a past day is stored at midday Lagos time and the
   note takes the same date (v17). `followups.outcome` is still
   written (other code and the Monday digest read it) but `outcomes` is the record.
+- **Workers** (v18): `people.is_worker` plus an optional `worker_title` (e.g. "Prophetic Lead"). A
+  worker is a member who serves. Tagged by the admin only, from the contact panel, like recording
+  membership; shown as a badge across Follow Up and as a filter on Membership. A member with no
+  Next Steps history (`member_since` set, 0 steps) reads as 'member' in `v_contacts` and is never
+  "waiting on a call".
 - Follow Up's contacts are rows in the SAME `people` table, with `source` ('next_steps',
   'welcome_card', 'group', 'referral'), so a welcome-card visitor who later scans the QR code
   stays one person. `phone` is nullable for them (a card may only have an email); a check

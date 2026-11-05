@@ -6,7 +6,7 @@ import BtnSm from '../components/BtnSm.jsx'
 import Modal from '../components/Modal.jsx'
 import Field, { TextInput } from '../components/Field.jsx'
 import EmptyState from '../components/EmptyState.jsx'
-import { CallLink, Chips, Stat } from '../components/followup.jsx'
+import { CallLink, Chips, Stat, WorkerBadge } from '../components/followup.jsx'
 import { useContactDialogs } from '../components/useContactDialogs.jsx'
 import { useMe } from '../context/MeContext.jsx'
 import { useAppToast } from '../context/ToastContext.jsx'
@@ -19,7 +19,8 @@ const daysSince = (d) => (d ? Math.floor((Date.now() - new Date(d + 'T00:00:00')
 // Everyone who has finished all four steps. The 30-day window is a waiting
 // period, not a decision: leadership decides, and the admin records what
 // they decided (people.member_since). Nothing here ever makes someone a
-// member automatically.
+// member automatically. Workers (members who serve, tagged by the admin
+// from the contact panel) have their own filter.
 export default function Membership({ contacts, outcomes, staff, refresh }) {
   const me = useMe()
   const toast = useAppToast()
@@ -34,7 +35,8 @@ export default function Membership({ contacts, outcomes, staff, refresh }) {
   const stageOf = (c) => (c.member_since ? 'member' : daysSince(c.completed_on) >= WINDOW_DAYS ? 'ready' : 'open')
   const counts = { open: 0, ready: 0, member: 0 }
   pipeline.forEach((c) => { counts[stageOf(c)]++ })
-  const rows = pipeline.filter((c) => stageOf(c) === stage)
+  const workers = pipeline.filter((c) => c.is_worker)
+  const rows = stage === 'workers' ? workers : pipeline.filter((c) => stageOf(c) === stage)
 
   const record = async () => {
     const { error } = await supabase.from('people').update({ member_since: date }).eq('id', recording.id)
@@ -54,23 +56,27 @@ export default function Membership({ contacts, outcomes, staff, refresh }) {
         <Stat label="Window open" value={counts.open} detail="Within 30 days of step 4" />
         <Stat label="Ready for a decision" value={counts.ready} detail="Window has passed" />
         <Stat label="Members" value={counts.member} detail="Recorded" />
+        <Stat label="Workers" value={workers.length} detail="Members who serve" />
       </div>
       <Card>
-        <div className="mb-3"><Chips label="Filter by stage" value={stage} onChange={setStage} options={[['open', 'Window open'], ['ready', 'Ready for a decision'], ['member', 'Members']]} /></div>
+        <div className="mb-3"><Chips label="Filter by stage" value={stage} onChange={setStage} options={[['open', 'Window open'], ['ready', 'Ready for a decision'], ['member', 'Members'], ['workers', 'Workers']]} /></div>
         {rows.map((c) => {
           const s = stageOf(c)
           const left = WINDOW_DAYS - daysSince(c.completed_on)
           return (
             <div key={c.id} className="flex items-center gap-3 py-3 border-b border-[#ECE7DA] last:border-b-0 flex-wrap">
-              <div className="flex gap-0.75 flex-none" aria-label="All four steps done">{[0, 1, 2, 3].map((i) => <span key={i} className="w-2.25 h-3.25 rounded-arch bg-orange" />)}</div>
+              {c.steps_done === 4
+                ? <div className="flex gap-0.75 flex-none" aria-label="All four steps done">{[0, 1, 2, 3].map((i) => <span key={i} className="w-2.25 h-3.25 rounded-arch bg-orange" />)}</div>
+                : <div className="w-[45px] flex-none" aria-hidden="true" />}
               <div className="flex-1 min-w-55">
                 <div className="text-[13px] font-extrabold text-ink-deep flex items-center gap-1.5 flex-wrap">
                   <button type="button" onClick={() => dlg.openContact(c)} className="underline decoration-line underline-offset-3 hover:text-orange">{c.full_name}</button>
                   <Badge variant={s === 'member' ? 'green' : s === 'ready' ? 'orange' : 'navy'}>{s === 'member' ? 'Member' : s === 'ready' ? 'Ready for a decision' : 'Window open'}</Badge>
+                  <WorkerBadge c={c} />
                   {c.hc_interest && <Badge variant="grey">House church</Badge>}
                 </div>
                 <div className="text-xs text-muted-sub mt-0.5">
-                  {s === 'member' ? `Member since ${fmtDate(c.member_since)} · completed ${fmtDate(c.completed_on)}`
+                  {s === 'member' ? `Member since ${fmtDate(c.member_since)}${c.completed_on && c.steps_done === 4 ? ` · completed ${fmtDate(c.completed_on)}` : ''}`
                     : s === 'ready' ? `Completed ${fmtDate(c.completed_on)} · window passed ${-left} days ago · waiting on leadership`
                     : `Completed ${fmtDate(c.completed_on)} · ${left} days left in the window`}
                 </div>

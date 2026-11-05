@@ -42,6 +42,43 @@ export function whyLine(c) {
   }
 }
 
+// A worker is a member who serves; the badge shows their title if they have one.
+export function WorkerBadge({ c }) {
+  if (!c.is_worker) return null
+  return <Badge variant="navy">{c.worker_title ? `Worker · ${c.worker_title}` : 'Worker'}</Badge>
+}
+
+// The admin tags a worker and sets an optional title, in the contact panel.
+// Admin only, like recording membership (people is director-write in RLS).
+function WorkerField({ c, onChanged }) {
+  const toast = useAppToast()
+  const [worker, setWorker] = useState(!!c.is_worker)
+  const [title, setTitle] = useState(c.worker_title || '')
+  const [saving, setSaving] = useState(false)
+  useEffect(() => { setWorker(!!c.is_worker); setTitle(c.worker_title || '') }, [c.id, c.is_worker, c.worker_title])
+  const changed = worker !== !!c.is_worker || title.trim() !== (c.worker_title || '')
+
+  const save = async () => {
+    setSaving(true)
+    const { error } = await supabase.from('people').update({ is_worker: worker, worker_title: worker ? title.trim() || null : null }).eq('id', c.id)
+    setSaving(false)
+    if (error) { toast(`Couldn't save that: ${error.message}`); return }
+    toast(worker ? `${c.full_name} is tagged as a worker.` : `${c.full_name} is no longer tagged as a worker.`)
+    onChanged?.()
+  }
+
+  return (
+    <Field label="Worker" htmlFor="cp-worker-title">
+      <label className="flex items-center gap-2 text-[13px] text-ink mb-2">
+        <input type="checkbox" checked={worker} onChange={(e) => setWorker(e.target.checked)} className="w-4 h-4 accent-orange" />
+        Serves as a worker
+      </label>
+      {worker && <TextInput id="cp-worker-title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title, if they have one (e.g. Prophetic Lead)" />}
+      {changed && <BtnSm className="mt-2" disabled={saving} onClick={save}>{saving ? 'Saving…' : 'Save'}</BtnSm>}
+    </Field>
+  )
+}
+
 export function CallLink({ phone, className = '' }) {
   if (!phone) return <span className="font-mono text-[11px] text-muted-faint">No phone on file</span>
   return (
@@ -328,7 +365,7 @@ export function ContactPanel({ contact, outcomes = [], staff = [], onClose, onCh
       open
       onClose={onClose}
       title={<span className="flex items-center gap-3"><Avatar name={c.full_name} size={40} fontSize={13} />{c.full_name}</span>}
-      sub={<span className="flex gap-1.5 flex-wrap mt-1"><SourceBadge c={c} /><ReasonBadge c={c} />{c.needs_check && <span className={checkBadgeClass}>Needs a check</span>}<AssigneeBadge c={c} me={me} /></span>}
+      sub={<span className="flex gap-1.5 flex-wrap mt-1"><SourceBadge c={c} /><ReasonBadge c={c} /><WorkerBadge c={c} />{c.needs_check && <span className={checkBadgeClass}>Needs a check</span>}<AssigneeBadge c={c} me={me} /></span>}
       footer={<>
         {canAct && <BtnSm variant="outline" onClick={() => onEdit?.(c)}>Edit details</BtnSm>}
         {canAct && !c.assigned_to && <BtnSm variant="outline" onClick={take}>Take it</BtnSm>}
@@ -351,6 +388,7 @@ export function ContactPanel({ contact, outcomes = [], staff = [], onClose, onCh
           </Select>
         </Field>
       )}
+      {isDirector && <WorkerField c={c} onChanged={onChanged} />}
       {c.prayer_request && (
         <div className="mt-4 bg-row-hover rounded-xl py-3.5 px-4">
           <div className="font-mono text-[9.5px] tracking-[.12em] uppercase text-muted-label font-semibold mb-1.5">Prayer request</div>
