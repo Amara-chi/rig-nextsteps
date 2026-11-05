@@ -96,7 +96,7 @@ export default function Membership({ contacts, outcomes, staff, refresh }) {
   const isDirector = me?.role === 'director'
   const canLog = isDirector || me?.role === 'support'
   const dlg = useContactDialogs({ contacts, outcomes, staff, refresh })
-  const [stage, setStageRaw] = useState('member')
+  const [stage, setStageRaw] = useState('workers')
   const [dept, setDeptRaw] = useState('all')
   const [recording, setRecording] = useState(null)
   const [date, setDate] = useState(todayStr())
