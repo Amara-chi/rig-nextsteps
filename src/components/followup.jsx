@@ -52,7 +52,9 @@ export function WorkerBadge({ c }) {
 // Every department already in use, for the department suggestions and the
 // Membership filter, so the same name is not typed three different ways.
 // A worker's departments, any number of them (v20).
-export const deptsOf = (c) => c.worker_departments || []
+// Falls back to v19's single worker_department, so departments set before
+// upgrade-v20.sql has run still show (and still filter).
+export const deptsOf = (c) => c.worker_departments?.length ? c.worker_departments : c.worker_department ? [c.worker_department] : []
 
 export const departmentsOf = (contacts) =>
   [...new Set(contacts.filter((c) => c.is_worker).flatMap(deptsOf))].sort((a, b) => a.localeCompare(b))
