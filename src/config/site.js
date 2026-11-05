@@ -102,6 +102,7 @@ export const CONTACT_REASONS = {
   attended: { label: 'Just attended', variant: 'grey' },
   hc: { label: 'House church', variant: 'grey' },
   member: { label: 'Member', variant: 'green' },
+  worker: { label: 'Worker', variant: 'navy' },
 }
 export const CONTACT_SOURCES = {
   next_steps: { label: 'Next Steps', variant: 'orange' },

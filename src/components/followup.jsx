@@ -38,6 +38,7 @@ export function whyLine(c) {
     case 'group': return `On the ${c.group_name || 'group'} list${c.first_visit ? ', added ' + fmtDate(c.first_visit) : ''}.`
     case 'attended': return 'Checked in on Sunday. The automatic thank-you is on its way.'
     case 'hc': return 'Interested in a house church.'
+    case 'worker': return 'A paid worker, not a member.'
     default: return c.member_since ? `Member since ${fmtDate(c.member_since)}.` : ''
   }
 }
@@ -139,9 +140,10 @@ export function CallLink({ phone, className = '' }) {
   )
 }
 
-// Members are not call targets: no "needs a check" flag and no caller to
-// assign, so neither shows for them anywhere in Follow Up.
-export const isMember = (c) => !!c.member_since
+// Members (and workers, who are members bar the rare paid one) are not call
+// targets: no "needs a check" flag and no caller to assign, so neither
+// shows for them anywhere in Follow Up.
+export const isMember = (c) => !!c.member_since || !!c.is_worker
 
 export function NeedsCheckBadge({ c }) {
   return c.needs_check && !isMember(c) ? <span className={checkBadgeClass}>Needs a check</span> : null
@@ -374,7 +376,7 @@ export function ContactFormDialog({ open, contact, staff = [], onClose, onSaved 
         </Field>
         <Field label="Age range" htmlFor="cf-age"><Select id="cf-age" value={f.age_range} onChange={set('age_range')}><option value="">Not given</option>{AGE_RANGES.map((a) => <option key={a}>{a}</option>)}</Select></Field>
         <Field label="Occupation" htmlFor="cf-occ"><TextInput id="cf-occ" value={f.occupation} onChange={set('occupation')} /></Field>
-        {editing && isDirector && (contact.member_since || contact.steps_done === 4) && (
+        {editing && isDirector && (contact.member_since || contact.steps_done === 4 || contact.is_worker) && (
           <Field label={<>Member since <span className="font-medium text-muted-label">(empty = not a member)</span></>} htmlFor="cf-member"><TextInput id="cf-member" type="date" value={f.member_since} onChange={set('member_since')} /></Field>
         )}
       </div>
@@ -467,7 +469,7 @@ export function ContactPanel({ contact, outcomes = [], staff = [], departments =
         </Field>
       )}
       {/* Only members, or people who have finished all four steps, can be workers. */}
-      {isDirector && (c.member_since || c.steps_done === 4) && <WorkerField c={c} departments={departments} onChanged={onChanged} />}
+      {isDirector && (c.member_since || c.steps_done === 4 || c.is_worker) && <WorkerField c={c} departments={departments} onChanged={onChanged} />}
       {c.prayer_request && (
         <div className="mt-4 bg-row-hover rounded-xl py-3.5 px-4">
           <div className="font-mono text-[9.5px] tracking-[.12em] uppercase text-muted-label font-semibold mb-1.5">Prayer request</div>

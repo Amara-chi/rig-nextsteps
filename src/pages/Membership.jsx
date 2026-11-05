@@ -14,7 +14,7 @@ import { useAppToast } from '../context/ToastContext.jsx'
 import { supabase } from '../lib/supabaseClient.js'
 import { fmtDate, todayStr } from '../lib/format.js'
 
-const blankMember = { full_name: '', phone: '', email: '', member_since: '', worker: false, title: '', departments: [] }
+const blankMember = { full_name: '', phone: '', email: '', member_since: '', worker: false, notMember: false, title: '', departments: [] }
 
 // The admin adds someone who is already a member (and maybe a worker) but
 // never came through Next Steps or a card. Created through add_contact, so
@@ -36,7 +36,8 @@ function AddMemberDialog({ open, departments, onClose, onSaved }) {
     } })
     if (error || data?.ok === false) { setSaving(false); toast("Couldn't add them. Check the name and phone or email."); return }
     const { error: e2 } = await supabase.from('people').update({
-      member_since: f.member_since || todayStr(), is_worker: f.worker,
+      // The rare paid worker who is not a member has no member_since.
+      member_since: f.worker && f.notMember ? null : f.member_since || todayStr(), is_worker: f.worker,
       worker_title: f.worker ? f.title.trim() || null : null, worker_departments: f.worker ? f.departments : [],
     }).eq('id', data.id)
     setSaving(false)
@@ -64,12 +65,18 @@ function AddMemberDialog({ open, departments, onClose, onSaved }) {
       <div className={g}>
         <Field label="Phone" htmlFor="am-phone"><TextInput id="am-phone" type="tel" value={f.phone} onChange={set('phone')} placeholder="0803 000 0000 or +44…" /></Field>
         <Field label="Email" htmlFor="am-email"><TextInput id="am-email" type="email" value={f.email} onChange={set('email')} /></Field>
-        <Field label={<>Member since <span className="font-medium text-muted-label">(empty = today)</span></>} htmlFor="am-since"><TextInput id="am-since" type="date" value={f.member_since} max={todayStr()} onChange={set('member_since')} /></Field>
+        {!(f.worker && f.notMember) && <Field label={<>Member since <span className="font-medium text-muted-label">(empty = today)</span></>} htmlFor="am-since"><TextInput id="am-since" type="date" value={f.member_since} max={todayStr()} onChange={set('member_since')} /></Field>}
       </div>
       <label className="flex items-center gap-2 text-[13px] text-ink mt-4">
         <input type="checkbox" checked={f.worker} onChange={set('worker')} className="w-4 h-4 accent-orange" />
         Serves as a worker
       </label>
+      {f.worker && (
+        <label className="flex items-center gap-2 text-[13px] text-ink mt-2 ml-6">
+          <input type="checkbox" checked={f.notMember} onChange={set('notMember')} className="w-4 h-4 accent-orange" />
+          Not a member (a paid worker)
+        </label>
+      )}
       {f.worker && (
         <div className={g}>
           <Field label="Title (optional)" htmlFor="am-title"><TextInput id="am-title" value={f.title} onChange={set('title')} placeholder="e.g. Prophetic Lead" /></Field>
@@ -112,7 +119,9 @@ export default function Membership({ contacts, outcomes, staff, refresh }) {
   const stageOf = (c) => (c.member_since ? 'member' : daysSince(c.completed_on) >= WINDOW_DAYS ? 'ready' : 'open')
   const counts = { open: 0, ready: 0, member: 0 }
   pipeline.forEach((c) => { counts[stageOf(c)]++ })
-  const workers = pipeline.filter((c) => c.is_worker)
+  // Every worker, including the rare paid one who is not a member (and so
+  // not in the membership pipeline above).
+  const workers = contacts.filter((c) => c.is_worker)
   const departments = departmentsOf(workers)
   const inDept = (c) => dept === 'all' || (dept === 'none' ? !deptsOf(c).length : deptsOf(c).includes(dept))
   const rows = stage === 'workers' ? workers.filter(inDept) : pipeline.filter((c) => stageOf(c) === stage)
@@ -216,13 +225,20 @@ export default function Membership({ contacts, outcomes, staff, refresh }) {
               <div className="flex-1 min-w-55">
                 <div className="text-[13px] font-extrabold text-ink-deep flex items-center gap-1.5 flex-wrap">
                   <button type="button" onClick={() => dlg.openContact(c)} className="underline decoration-line underline-offset-3 hover:text-orange">{c.full_name}</button>
-                  <Badge variant={s === 'member' ? 'green' : s === 'ready' ? 'orange' : 'navy'}>{s === 'member' ? 'Member' : s === 'ready' ? 'Ready for a decision' : 'Window open'}</Badge>
-                  <WorkerBadge c={c} />
+                  {stage === 'workers' ? <>
+                    {/* Workers are members as a rule, so their pills are what they do. */}
+                    {c.worker_title && <Badge variant="navy">{c.worker_title}</Badge>}
+                    {deptsOf(c).map((d) => <Badge key={d} variant="grey">{d}</Badge>)}
+                    {!c.member_since && <Badge variant="orange">Not a member</Badge>}
+                  </> : <>
+                    <Badge variant={s === 'member' ? 'green' : s === 'ready' ? 'orange' : 'navy'}>{s === 'member' ? 'Member' : s === 'ready' ? 'Ready for a decision' : 'Window open'}</Badge>
+                    <WorkerBadge c={c} />
+                  </>}
                   {c.hc_interest && <Badge variant="grey">House church</Badge>}
                 </div>
                 <div className="text-xs text-muted-sub mt-0.5">
-                  {c.is_worker && deptsOf(c).length > 0 && <span className="font-semibold text-ink">{deptsOf(c).join(', ')} · </span>}
-                  {s === 'member' ? `Member since ${fmtDate(c.member_since)}${c.completed_on && c.steps_done === 4 ? ` · completed ${fmtDate(c.completed_on)}` : ''}`
+                  {stage === 'workers' && !c.member_since ? 'Paid worker'
+                    : s === 'member' ? `Member since ${fmtDate(c.member_since)}${c.completed_on && c.steps_done === 4 ? ` · completed ${fmtDate(c.completed_on)}` : ''}`
                     : s === 'ready' ? `Completed ${fmtDate(c.completed_on)} · window passed ${-left} days ago · waiting on leadership`
                     : `Completed ${fmtDate(c.completed_on)} · ${left} days left in the window`}
                 </div>
