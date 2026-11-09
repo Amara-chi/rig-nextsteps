@@ -43,11 +43,21 @@ export function whyLine(c) {
   }
 }
 
-// A worker is a member who serves; the badge shows their title if they have one.
+// A worker is a member who serves; the badge shows their designations if they have any.
 export function WorkerBadge({ c }) {
   if (!c.is_worker) return null
-  return <Badge variant="navy">{c.worker_title ? `Worker · ${c.worker_title}` : 'Worker'}</Badge>
+  const titles = titlesOf(c)
+  return <Badge variant="navy">{titles.length ? `Worker · ${titles.join(', ')}` : 'Worker'}</Badge>
 }
+
+// A worker's designations, any number of them (v22), since they serve
+// across departments. Falls back to v18's single worker_title, so
+// designations set before upgrade-v22.sql has run still show.
+export const titlesOf = (c) => c.worker_titles?.length ? c.worker_titles : c.worker_title ? [c.worker_title] : []
+
+// Every designation already in use, for suggestions.
+export const designationsOf = (contacts) =>
+  [...new Set(contacts.filter((c) => c.is_worker).flatMap(titlesOf))].sort((a, b) => a.localeCompare(b))
 
 // Every department already in use, for the department suggestions and the
 // Membership filter, so the same name is not typed three different ways.
@@ -59,9 +69,10 @@ export const deptsOf = (c) => c.worker_departments?.length ? c.worker_department
 export const departmentsOf = (contacts) =>
   [...new Set(contacts.filter((c) => c.is_worker).flatMap(deptsOf))].sort((a, b) => a.localeCompare(b))
 
-// Departments as removable chips plus a box to add another (Enter, comma or
-// the Add button; whatever is still typed is added when the box loses focus).
-export function DepartmentsInput({ id, value, onChange, options = [] }) {
+// Departments or designations as removable chips plus a box to add another
+// (Enter, comma or the Add button; whatever is still typed is added when the
+// box loses focus).
+export function TagsInput({ id, value, onChange, options = [], noun = 'department' }) {
   const [text, setText] = useState('')
   const add = () => {
     const names = text.split(',').map((s) => s.trim()).filter(Boolean)
@@ -85,7 +96,7 @@ export function DepartmentsInput({ id, value, onChange, options = [] }) {
       <div className="flex gap-2">
         <TextInput id={id} list={`${id}-list`} value={text} onChange={(e) => setText(e.target.value)} onBlur={add}
           onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); add() } }}
-          placeholder={value.length ? 'Add another department' : 'Department'} aria-label="Add a department" />
+          placeholder={value.length ? `Add another ${noun}` : noun[0].toUpperCase() + noun.slice(1)} aria-label={`Add a ${noun}`} />
         <BtnSm variant="outline" onClick={add}>Add</BtnSm>
       </div>
       <datalist id={`${id}-list`}>{options.filter((d) => !value.includes(d)).map((d) => <option key={d} value={d} />)}</datalist>
@@ -93,22 +104,28 @@ export function DepartmentsInput({ id, value, onChange, options = [] }) {
   )
 }
 
-// The admin tags a worker and sets an optional title and departments, in
+// The admin tags a worker and sets their designations and departments, in
 // the contact panel. Admin only, like recording membership (people is
 // director-write in RLS).
-function WorkerField({ c, departments = [], onChanged }) {
+function WorkerField({ c, departments = [], designations = [], onChanged }) {
   const toast = useAppToast()
   const [worker, setWorker] = useState(!!c.is_worker)
-  const [title, setTitle] = useState(c.worker_title || '')
+  const [titles, setTitles] = useState(titlesOf(c))
   const [depts, setDepts] = useState(deptsOf(c))
   const [saving, setSaving] = useState(false)
+  const titleKey = titlesOf(c).join('|')
   const deptKey = deptsOf(c).join('|')
-  useEffect(() => { setWorker(!!c.is_worker); setTitle(c.worker_title || ''); setDepts(deptsOf(c)) }, [c.id, c.is_worker, c.worker_title, deptKey])
-  const changed = worker !== !!c.is_worker || title.trim() !== (c.worker_title || '') || depts.join('|') !== deptKey
+  useEffect(() => { setWorker(!!c.is_worker); setTitles(titlesOf(c)); setDepts(deptsOf(c)) }, [c.id, c.is_worker, titleKey, deptKey])
+  const changed = worker !== !!c.is_worker || titles.join('|') !== titleKey || depts.join('|') !== deptKey
 
   const save = async () => {
     setSaving(true)
-    const { error } = await supabase.from('people').update({ is_worker: worker, worker_title: worker ? title.trim() || null : null, worker_departments: worker ? depts : [] }).eq('id', c.id)
+    // The retired single columns are cleared too, or the fallbacks in
+    // titlesOf/deptsOf would bring an old value back once the list is empty.
+    const { error } = await supabase.from('people').update({
+      is_worker: worker, worker_titles: worker ? titles : [], worker_departments: worker ? depts : [],
+      worker_title: null, worker_department: null,
+    }).eq('id', c.id)
     setSaving(false)
     if (error) { toast(`Couldn't save that: ${error.message}`); return }
     toast(worker ? `${c.full_name} is tagged as a worker.` : `${c.full_name} is no longer tagged as a worker.`)
@@ -123,8 +140,8 @@ function WorkerField({ c, departments = [], onChanged }) {
       </label>
       {worker && (
         <div className="grid gap-2">
-          <TextInput id="cp-worker-title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title, if they have one" aria-label="Title" />
-          <DepartmentsInput id="cp-worker-dept" value={depts} onChange={setDepts} options={departments} />
+          <TagsInput id="cp-worker-title" value={titles} onChange={setTitles} options={designations} noun="designation" />
+          <TagsInput id="cp-worker-dept" value={depts} onChange={setDepts} options={departments} />
         </div>
       )}
       {changed && <BtnSm className="mt-2" disabled={saving} onClick={save}>{saving ? 'Saving…' : 'Save'}</BtnSm>}
@@ -401,7 +418,7 @@ export function ContactFormDialog({ open, contact, staff = [], onClose, onSaved 
 }
 
 // ---------- The contact panel: the whole record in one place ----------
-export function ContactPanel({ contact, outcomes = [], staff = [], departments = [], focusNote = false, onClose, onChanged, onLog, onEdit, onDelete, onEditOutcome, onDeleteOutcome }) {
+export function ContactPanel({ contact, outcomes = [], staff = [], departments = [], designations = [], focusNote = false, onClose, onChanged, onLog, onEdit, onDelete, onEditOutcome, onDeleteOutcome }) {
   const me = useMe()
   const toast = useAppToast()
   // "Add a note" opens the panel with the note box ready to type in.
@@ -471,7 +488,7 @@ export function ContactPanel({ contact, outcomes = [], staff = [], departments =
         </Field>
       )}
       {/* Only members, or people who have finished all four steps, can be workers. */}
-      {isDirector && (c.member_since || c.steps_done === 4 || c.is_worker) && <WorkerField c={c} departments={departments} onChanged={onChanged} />}
+      {isDirector && (c.member_since || c.steps_done === 4 || c.is_worker) && <WorkerField c={c} departments={departments} designations={designations} onChanged={onChanged} />}
       {c.prayer_request && (
         <div className="mt-4 bg-row-hover rounded-xl py-3.5 px-4">
           <div className="font-mono text-[9.5px] tracking-[.12em] uppercase text-muted-label font-semibold mb-1.5">Prayer request</div>

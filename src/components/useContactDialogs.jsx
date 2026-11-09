@@ -2,7 +2,7 @@ import { useState } from 'react'
 import Modal from './Modal.jsx'
 import { useAppToast } from '../context/ToastContext.jsx'
 import { supabase } from '../lib/supabaseClient.js'
-import { ContactFormDialog, ContactPanel, DeleteOutcomeDialog, OutcomeDialog, departmentsOf } from './followup.jsx'
+import { ContactFormDialog, ContactPanel, DeleteOutcomeDialog, OutcomeDialog, departmentsOf, designationsOf } from './followup.jsx'
 import ImportContacts from './ImportContacts.jsx'
 
 // One set of dialogs per Follow Up page: open a contact, log or edit an
@@ -28,6 +28,7 @@ export function useContactDialogs({ contacts, outcomes, staff, refresh }) {
         outcomes={outcomes}
         staff={staff}
         departments={departmentsOf(contacts)}
+        designations={designationsOf(contacts)}
         focusNote={focusNote}
         onClose={() => { setPanelId(null); setFocusNote(false) }}
         onDelete={(c) => setRemoving(c)}

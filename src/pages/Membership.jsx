@@ -7,19 +7,19 @@ import Modal from '../components/Modal.jsx'
 import Dialog from '../components/Dialog.jsx'
 import Field, { Select, TextInput } from '../components/Field.jsx'
 import EmptyState from '../components/EmptyState.jsx'
-import { CallLink, Chips, DepartmentsInput, Stat, WorkerBadge, departmentsOf, deptsOf } from '../components/followup.jsx'
+import { CallLink, Chips, TagsInput, Stat, WorkerBadge, departmentsOf, deptsOf, designationsOf, titlesOf } from '../components/followup.jsx'
 import { useContactDialogs } from '../components/useContactDialogs.jsx'
 import { useMe } from '../context/MeContext.jsx'
 import { useAppToast } from '../context/ToastContext.jsx'
 import { supabase } from '../lib/supabaseClient.js'
 import { fmtDate, todayStr } from '../lib/format.js'
 
-const blankMember = { full_name: '', phone: '', email: '', member_since: '', worker: false, notMember: false, title: '', departments: [] }
+const blankMember = { full_name: '', phone: '', email: '', member_since: '', worker: false, notMember: false, titles: [], departments: [] }
 
 // The admin adds someone who is already a member (and maybe a worker) but
 // never came through Next Steps or a card. Created through add_contact, so
 // a phone already on file updates that person instead of making a second.
-function AddMemberDialog({ open, departments, onClose, onSaved }) {
+function AddMemberDialog({ open, departments, designations, onClose, onSaved }) {
   const toast = useAppToast()
   const [f, setF] = useState(blankMember)
   const [saving, setSaving] = useState(false)
@@ -38,7 +38,8 @@ function AddMemberDialog({ open, departments, onClose, onSaved }) {
     const { error: e2 } = await supabase.from('people').update({
       // The rare paid worker who is not a member has no member_since.
       member_since: f.worker && f.notMember ? null : f.member_since || todayStr(), is_worker: f.worker,
-      worker_title: f.worker ? f.title.trim() || null : null, worker_departments: f.worker ? f.departments : [],
+      worker_titles: f.worker ? f.titles : [], worker_departments: f.worker ? f.departments : [],
+      worker_title: null, worker_department: null,
     }).eq('id', data.id)
     setSaving(false)
     if (e2) { toast(`Added, but not as a member: ${e2.message}`); onSaved(); return }
@@ -79,9 +80,11 @@ function AddMemberDialog({ open, departments, onClose, onSaved }) {
       )}
       {f.worker && (
         <div className={g}>
-          <Field label="Title (optional)" htmlFor="am-title"><TextInput id="am-title" value={f.title} onChange={set('title')} placeholder="e.g. Prophetic Lead" /></Field>
-          <Field label="Department (optional)" htmlFor="am-dept">
-            <DepartmentsInput id="am-dept" value={f.departments} onChange={(v) => setF((x) => ({ ...x, departments: v }))} options={departments} />
+          <Field label="Designations (optional)" htmlFor="am-title">
+            <TagsInput id="am-title" value={f.titles} onChange={(v) => setF((x) => ({ ...x, titles: v }))} options={designations} noun="designation" />
+          </Field>
+          <Field label="Departments (optional)" htmlFor="am-dept">
+            <TagsInput id="am-dept" value={f.departments} onChange={(v) => setF((x) => ({ ...x, departments: v }))} options={departments} />
           </Field>
         </div>
       )}
@@ -206,7 +209,7 @@ export default function Membership({ contacts, outcomes, staff, refresh }) {
                 <BtnSm variant="outline" onClick={() => { setBulkDept(''); setBulk('add-dept') }}>Add to department</BtnSm>
                 {chosen.some((c) => deptsOf(c).length) && <BtnSm variant="outline" onClick={() => { setBulkDept(''); setBulk('remove-dept') }}>Remove from department</BtnSm>}
               </>}
-              {stage === 'workers' && <BtnSm variant="outline" onClick={() => bulkUpdate({ is_worker: false, worker_title: null, worker_departments: [] }, `${people(n)} removed from workers.`)}>Remove from workers</BtnSm>}
+              {stage === 'workers' && <BtnSm variant="outline" onClick={() => bulkUpdate({ is_worker: false, worker_title: null, worker_titles: [], worker_department: null, worker_departments: [] }, `${people(n)} removed from workers.`)}>Remove from workers</BtnSm>}
               <BtnSm variant="outline" className="border-[#E8B4A6]! text-orange-deep!" onClick={() => setBulk('delete')}>Delete</BtnSm>
               <button type="button" onClick={() => setPicked(new Set())} className="text-xs font-bold text-muted-sub underline ml-auto">Clear</button>
             </>}
@@ -227,7 +230,7 @@ export default function Membership({ contacts, outcomes, staff, refresh }) {
                   <button type="button" onClick={() => dlg.openContact(c)} className="underline decoration-line underline-offset-3 hover:text-orange">{c.full_name}</button>
                   {stage === 'workers' ? <>
                     {/* Workers are members as a rule, so their pills are what they do. */}
-                    {c.worker_title && <Badge variant="navy">{c.worker_title}</Badge>}
+                    {titlesOf(c).map((t) => <Badge key={t} variant="navy">{t}</Badge>)}
                     {deptsOf(c).map((d) => <Badge key={d} variant="grey">{d}</Badge>)}
                     {!c.member_since && <Badge variant="orange">Not a member</Badge>}
                   </> : <>
@@ -293,7 +296,7 @@ export default function Membership({ contacts, outcomes, staff, refresh }) {
         )}
         {bulk === 'delete' && <p className="text-[13px] text-muted-body mt-3">This removes them from the platform permanently, with their notes, outcomes and any check-ins. It cannot be undone.</p>}
       </Modal>
-      <AddMemberDialog open={adding} departments={departmentsOf(contacts)} onClose={() => setAdding(false)} onSaved={refresh} />
+      <AddMemberDialog open={adding} departments={departmentsOf(contacts)} designations={designationsOf(contacts)} onClose={() => setAdding(false)} onSaved={refresh} />
       {dlg.dialogs}
     </>
   )

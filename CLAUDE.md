@@ -117,7 +117,7 @@ there is the reference for the sidebar and Follow Up pages, `TodayN.dc.html` for
   `member_since` is the mailing-list subscription date, flagged in `needs_check` as unconfirmed.
 - `supabase/seed-bible-study.sql` — optional, idempotent: the Seven Churches series (8 sessions,
   Jul to Sep 2026) as written up on the design canvas. Run after v15.
-- `supabase/upgrade-v3.sql` through `upgrade-v21.sql` — only for databases created from older
+- `supabase/upgrade-v3.sql` through `upgrade-v22.sql` — only for databases created from older
   schema versions; NOT needed on fresh installs
 - `supabase/templates/` — the branded auth emails GoTrue sends: `reset-password.html`
   (forgot-password link) and `invite.html` (new staff member's first sign in). Same shell as
@@ -207,13 +207,17 @@ there is the reference for the sidebar and Follow Up pages, `TodayN.dc.html` for
   (today by default, never the future); a past day is stored at midday Lagos time and the
   note takes the same date (v17). `followups.outcome` is still
   written (other code and the Monday digest read it) but `outcomes` is the record.
-- **Workers** (v18): `people.is_worker` plus an optional `worker_title` (e.g. "Prophetic Lead") and,
-  since v20, any number of free-text departments in `worker_departments text[]` (suggested from
-  the names already in use, filterable on Membership's Workers view). v19's single
-  `worker_department` was copied across and is no longer read; it stays only because
-  `v_contacts` can gain columns only at the end. Workers are members as a rule; the rare paid
+- **Workers** (v18): `people.is_worker` plus, since v22, any number of free-text designations in
+  `worker_titles text[]` (e.g. "Prophetic Lead"; workers serve across departments, so one
+  designation was not enough) and, since v20, any number of free-text departments in
+  `worker_departments text[]` (both suggested from the names already in use; departments are
+  filterable on Membership's Workers view). The single `worker_title` (v18) and
+  `worker_department` (v19) were copied across and are read only as a fallback
+  (`titlesOf`/`deptsOf` in `followup.jsx`); every save clears them, so an emptied list can't
+  bring an old value back. They stay only because `v_contacts` can gain columns only at the
+  end. Workers are members as a rule; the rare paid
   worker who is not one is `is_worker` with no `member_since` (v21: reason 'worker', never
-  waiting on a call). The Workers tab shows title and department pills, not a Member pill. A
+  waiting on a call). The Workers tab shows designation and department pills, not a Member pill. A
   worker is a member who serves. Tagged by the admin only, from the contact panel, like recording
   membership; shown as a badge across Follow Up and as a filter on Membership. A member with no
   Next Steps history (`member_since` set, 0 steps) reads as 'member' in `v_contacts` and is never
