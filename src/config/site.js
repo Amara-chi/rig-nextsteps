@@ -18,6 +18,19 @@ export const CHURCH_NAME = 'Rig Church Lagos'
 // than silently overwriting it.
 export const HEARD_OPTIONS = ['A friend or family member', 'Instagram', 'WhatsApp', 'Walked past / neighbourhood', 'Google search', 'Other']
 
+// State of residence on the check-in form: Lagos first (most of the church),
+// then the other 35 states and the FCT alphabetically, then a way out for
+// someone visiting from abroad. Stored as the text shown here.
+export const NG_STATES = [
+  'Lagos',
+  'Abia', 'Adamawa', 'Akwa Ibom', 'Anambra', 'Bauchi', 'Bayelsa', 'Benue', 'Borno',
+  'Cross River', 'Delta', 'Ebonyi', 'Edo', 'Ekiti', 'Enugu', 'FCT (Abuja)', 'Gombe',
+  'Imo', 'Jigawa', 'Kaduna', 'Kano', 'Katsina', 'Kebbi', 'Kogi', 'Kwara',
+  'Nasarawa', 'Niger', 'Ogun', 'Ondo', 'Osun', 'Oyo', 'Plateau', 'Rivers',
+  'Sokoto', 'Taraba', 'Yobe', 'Zamfara',
+  'Outside Nigeria',
+]
+
 // Your leader's WhatsApp number for the one-tap weekly report
 // (e.g. "0803 000 0000"). Leave "" to pick the contact each time.
 export const LEADER_WHATSAPP = ''

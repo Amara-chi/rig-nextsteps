@@ -117,7 +117,7 @@ there is the reference for the sidebar and Follow Up pages, `TodayN.dc.html` for
   `member_since` is the mailing-list subscription date, flagged in `needs_check` as unconfirmed.
 - `supabase/seed-bible-study.sql` — optional, idempotent: the Seven Churches series (8 sessions,
   Jul to Sep 2026) as written up on the design canvas. Run after v15.
-- `supabase/upgrade-v3.sql` through `upgrade-v22.sql` — only for databases created from older
+- `supabase/upgrade-v3.sql` through `upgrade-v23.sql` — only for databases created from older
   schema versions; NOT needed on fresh installs
 - `supabase/templates/` — the branded auth emails GoTrue sends: `reset-password.html`
   (forgot-password link) and `invite.html` (new staff member's first sign in). Same shell as
@@ -226,6 +226,15 @@ there is the reference for the sidebar and Follow Up pages, `TodayN.dc.html` for
   'welcome_card', 'group', 'referral'), so a welcome-card visitor who later scans the QR code
   stays one person. `phone` is nullable for them (a card may only have an email); a check
   constraint still requires phone or email.
+- **Newcomer details on the check-in form** (v23, 22 Nov 2026): a NEW visitor must give full
+  address, state of residence (dropdown, `NG_STATES` in `site.js`: Lagos first, the other 35
+  states and FCT, then "Outside Nigeria"), profession and date of birth before picking a step.
+  Returning visitors skip the details screen, so nothing is asked of them again. They reuse
+  the welcome-card columns (`address`, `occupation`, `birth_day/_month/_year`); `state` is the
+  one new column. `check_in()` gained four defaulted args and the old six-arg version was
+  dropped (no overload), so check-ins queued offline before the change still land. Run v23
+  BEFORE deploying the frontend: until then every newcomer check-in fails on the unknown args
+  and sits in the phone's offline queue.
 
 ## Security model (RLS — enforced in the database, never trust the client)
 Three staff roles, checked by `public.is_director()` / `is_leader()` / `is_support()`:

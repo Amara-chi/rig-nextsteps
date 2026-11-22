@@ -13,9 +13,15 @@ import { useMe } from '../context/MeContext.jsx'
 import { useAppToast } from '../context/ToastContext.jsx'
 import { supabase } from '../lib/supabaseClient.js'
 import { normPhoneJS } from '../lib/phone.js'
-import { fmtDate, fmtPhone, initials } from '../lib/format.js'
+import { fmtBirthday, fmtDate, fmtPhone, initials } from '../lib/format.js'
 import { todayStr } from '../lib/format.js'
-import { STEPS, stepOf, HEARD_OPTIONS, isSuperAdmin } from '../config/site.js'
+import { STEPS, stepOf, HEARD_OPTIONS, MONTHS, NG_STATES, isSuperAdmin } from '../config/site.js'
+
+// A full date of birth as YYYY-MM-DD for the date input, or '' when any
+// part is missing (a welcome card often gives only day and month).
+const dobOf = (p) => (p.birth_day && p.birth_month && p.birth_year
+  ? `${p.birth_year}-${String(p.birth_month).padStart(2, '0')}-${String(p.birth_day).padStart(2, '0')}`
+  : '')
 
 function badgeFor(p) {
   if (p.member_since) return ['green', 'Member since ' + fmtDate(p.member_since)]
@@ -114,6 +120,21 @@ function PersonRow({ p, isDirector, onFlip, onEdit, onBackfill, onWelcome, onDel
                 <div className="font-bold text-[12.5px] text-ink-deep">{p.heard_about || '—'}</div>
               </div>
               <div>
+                <div className="font-mono text-[9px] tracking-[.1em] uppercase text-muted-label font-semibold mb-0.75">Address</div>
+                <div className="font-bold text-[12.5px] text-ink-deep">
+                  {p.address || '—'}
+                  {p.state && <><br /><span className="font-medium text-muted-sub">{p.state}</span></>}
+                </div>
+              </div>
+              <div>
+                <div className="font-mono text-[9px] tracking-[.1em] uppercase text-muted-label font-semibold mb-0.75">Profession</div>
+                <div className="font-bold text-[12.5px] text-ink-deep">{p.occupation || '—'}</div>
+              </div>
+              <div>
+                <div className="font-mono text-[9px] tracking-[.1em] uppercase text-muted-label font-semibold mb-0.75">Date of birth</div>
+                <div className="font-bold text-[12.5px] text-ink-deep">{fmtBirthday(p, MONTHS) || '—'}</div>
+              </div>
+              <div>
                 <div className="font-mono text-[9px] tracking-[.1em] uppercase text-muted-label font-semibold mb-0.75">Interest — reported to leader</div>
                 <div className="flex gap-1.75 mt-1 flex-wrap">
                   {isDirector && (
@@ -193,6 +214,10 @@ export default function People({ people, onDataChange }) {
   const [editPhone, setEditPhone] = useState('')
   const [editEmail, setEditEmail] = useState('')
   const [editHeard, setEditHeard] = useState('')
+  const [editAddress, setEditAddress] = useState('')
+  const [editState, setEditState] = useState('')
+  const [editOccupation, setEditOccupation] = useState('')
+  const [editDob, setEditDob] = useState('')
   const [editFirstTime, setEditFirstTime] = useState(false)
   const [editMemberSince, setEditMemberSince] = useState('')
   const [editHc, setEditHc] = useState(false)
@@ -236,6 +261,10 @@ export default function People({ people, onDataChange }) {
     setEditPhone(fmtPhone(p.phone))
     setEditEmail(p.email || '')
     setEditHeard(p.heard_about || '')
+    setEditAddress(p.address || '')
+    setEditState(p.state || '')
+    setEditOccupation(p.occupation || '')
+    setEditDob(dobOf(p))
     setEditFirstTime(!!p.first_time)
     setEditMemberSince(p.member_since || '')
     setEditHc(!!p.hc_interest)
@@ -318,10 +347,20 @@ export default function People({ people, onDataChange }) {
             phone: normPhoneJS(editPhone),
             email: editEmail.trim() || null,
             heard_about: editHeard || null,
+            address: editAddress.trim() || null,
+            state: editState || null,
+            occupation: editOccupation.trim() || null,
             first_time: editFirstTime,
             member_since: editMemberSince || null,
             hc_interest: editHc,
             serving_interest: editServing,
+          }
+          // Only touch the birthday when the date was changed here, so a
+          // day-and-month-only birthday from a welcome card isn't wiped just
+          // because the date box can't show it.
+          if (editDob !== dobOf(editPerson)) {
+            const [y, m, d] = editDob ? editDob.split('-').map(Number) : [null, null, null]
+            Object.assign(upd, { birth_year: y, birth_month: m, birth_day: d })
           }
           if (!upd.full_name || upd.phone.length < 10) { toast('Please check the name and phone number.'); return false }
 
@@ -379,6 +418,18 @@ export default function People({ people, onDataChange }) {
             {!!editHeard && !HEARD_OPTIONS.includes(editHeard) && <option value={editHeard}>{editHeard}</option>}
             {HEARD_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
           </Select>
+        </Field>
+        <Field label="Full address"><TextInput value={editAddress} onChange={(e) => setEditAddress(e.target.value)} /></Field>
+        <Field label="State of residence">
+          <Select value={editState} onChange={(e) => setEditState(e.target.value)}>
+            <option value="">Not recorded</option>
+            {!!editState && !NG_STATES.includes(editState) && <option value={editState}>{editState}</option>}
+            {NG_STATES.map((s) => <option key={s} value={s}>{s}</option>)}
+          </Select>
+        </Field>
+        <Field label="Profession"><TextInput value={editOccupation} onChange={(e) => setEditOccupation(e.target.value)} /></Field>
+        <Field label="Date of birth">
+          <TextInput type="date" value={editDob} min="1900-01-01" max={todayStr()} onChange={(e) => setEditDob(e.target.value)} />
         </Field>
         <Field label="First time at Rig Church?">
           <Select value={editFirstTime ? 'yes' : 'no'} onChange={(e) => setEditFirstTime(e.target.value === 'yes')}>

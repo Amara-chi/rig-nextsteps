@@ -9,7 +9,7 @@ import { useMe } from '../context/MeContext.jsx'
 import { useAppToast } from '../context/ToastContext.jsx'
 import { supabase } from '../lib/supabaseClient.js'
 import { fmtBirthday, fmtDate, fmtPhone, fmtWhen, localDay, telHref, todayStr } from '../lib/format.js'
-import { AGE_RANGES, CONTACT_REASONS, CONTACT_SOURCES, MONTHS, OUTCOME_ACTIONS, outcomeLabel } from '../config/site.js'
+import { AGE_RANGES, CONTACT_REASONS, CONTACT_SOURCES, MONTHS, NG_STATES, OUTCOME_ACTIONS, outcomeLabel } from '../config/site.js'
 
 // Shared pieces for the Follow Up pages (dashboard, Contacts, Outcomes,
 // Membership, House Church), so a contact looks and behaves the same
@@ -308,7 +308,7 @@ export function DeleteOutcomeDialog({ outcome, onClose, onDeleted }) {
 }
 
 // ---------- Add (or edit) a contact ----------
-const blankContact = { member_since: '', full_name: '', phone: '', email: '', source: 'welcome_card', group_name: '', gender: '', birth_day: '', birth_month: '', birth_year: '', age_range: '', address: '', occupation: '', referral: '', prayer_request: '', first_visit: '', needs_check: '', assigned_to: '' }
+const blankContact = { member_since: '', full_name: '', phone: '', email: '', source: 'welcome_card', group_name: '', gender: '', birth_day: '', birth_month: '', birth_year: '', age_range: '', address: '', state: '', occupation: '', referral: '', prayer_request: '', first_visit: '', needs_check: '', assigned_to: '' }
 
 export function ContactFormDialog({ open, contact, staff = [], onClose, onSaved }) {
   const me = useMe()
@@ -395,6 +395,14 @@ export function ContactFormDialog({ open, contact, staff = [], onClose, onSaved 
         </Field>
         <Field label="Age range" htmlFor="cf-age"><Select id="cf-age" value={f.age_range} onChange={set('age_range')}><option value="">Not given</option>{AGE_RANGES.map((a) => <option key={a}>{a}</option>)}</Select></Field>
         <Field label="Occupation" htmlFor="cf-occ"><TextInput id="cf-occ" value={f.occupation} onChange={set('occupation')} /></Field>
+        <Field label="State of residence" htmlFor="cf-state">
+          <Select id="cf-state" value={f.state} onChange={set('state')}>
+            <option value="">Not given</option>
+            {/* A value from outside the list stays selectable, so saving can't wipe it. */}
+            {!!f.state && !NG_STATES.includes(f.state) && <option value={f.state}>{f.state}</option>}
+            {NG_STATES.map((s) => <option key={s} value={s}>{s}</option>)}
+          </Select>
+        </Field>
         {editing && isDirector && (contact.member_since || contact.steps_done === 4 || contact.is_worker) && (
           <Field label={<>Member since <span className="font-medium text-muted-label">(empty = not a member)</span></>} htmlFor="cf-member"><TextInput id="cf-member" type="date" value={f.member_since} onChange={set('member_since')} /></Field>
         )}
@@ -452,6 +460,7 @@ export function ContactPanel({ contact, outcomes = [], staff = [], departments =
     ['Birthday', fmtBirthday(c, MONTHS) || 'Not given'],
     ['Age range', c.age_range || 'Not given'],
     ['Address or area', c.address || 'Not given'],
+    ['State of residence', c.state || 'Not given'],
     ['Occupation', c.occupation || 'Not given'],
     ['Invited by or heard through', c.referral || 'Not given'],
     ...(c.member_since ? [['Member since', fmtDate(c.member_since)]] : []),

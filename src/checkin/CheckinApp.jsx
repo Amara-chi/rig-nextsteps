@@ -1,8 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
 import { supabase } from '../lib/supabaseClient.js'
-import { STEPS, HEARD_OPTIONS } from '../config/site.js'
+import { STEPS, HEARD_OPTIONS, NG_STATES } from '../config/site.js'
 
 const QUEUE_KEY = 'rig_pending_checkins'
+
+// Today on this phone as YYYY-MM-DD (local, not UTC), the date input's own
+// format, so a date of birth can be capped at today.
+const todayISO = () => {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
 
 // Custom dropdown arrow — kept as an inline style (not a Tailwind class)
 // since the data: URI's quotes/percent-escapes don't survive being embedded
@@ -59,6 +66,12 @@ export default function CheckinApp() {
   const [email, setEmail] = useState('')
   const [firstTime, setFirstTime] = useState(null)
   const [heard, setHeard] = useState(HEARD_OPTIONS[0])
+  const [address, setAddress] = useState('')
+  const [stateRes, setStateRes] = useState('')
+  const [profession, setProfession] = useState('')
+  const [dob, setDob] = useState('')
+  // Which required details are missing, by field, shown after Continue.
+  const [detailErrs, setDetailErrs] = useState({})
 
   const [step, setStep] = useState(null)
   const [stepsShake, setStepsShake] = useState(false)
@@ -103,14 +116,23 @@ export default function CheckinApp() {
   }
 
   const handleDetailsContinue = () => {
-    if (!fullname.trim()) { setNameErr(true); return }
-    setNameErr(false)
+    const errs = {
+      address: !address.trim(),
+      state: !stateRes,
+      profession: !profession.trim(),
+      dob: !dob || dob > todayISO() || dob < '1900-01-01',
+    }
+    const nameMissing = !fullname.trim()
+    setNameErr(nameMissing)
+    setDetailErrs(errs)
+    if (nameMissing || Object.values(errs).some(Boolean)) return
     setScreen('step')
   }
 
   const resetForm = () => {
     clearTimeout(kioskTimerRef.current)
     setPhone(''); setFullname(''); setEmail('')
+    setAddress(''); setStateRes(''); setProfession(''); setDob(''); setDetailErrs({})
     setReturning(false); setFirstName(''); setDoneSteps([]); setStep(null); setFirstTime(null)
     setPhoneErr(false); setNameErr(false)
     setScreen('phone')
@@ -129,6 +151,10 @@ export default function CheckinApp() {
       p_email: returning ? null : email.trim(),
       p_first_time: returning ? false : firstTime === true,
       p_heard: (!returning && firstTime) ? heard : null,
+      p_address: returning ? null : address.trim(),
+      p_state: returning ? null : stateRes,
+      p_occupation: returning ? null : profession.trim(),
+      p_birth_date: returning ? null : dob,
     }
     setSubmitting(true)
     const first = returning ? firstName : (payload.p_name || '').split(' ')[0]
@@ -215,6 +241,29 @@ export default function CheckinApp() {
             <div className="mt-4">
               <label htmlFor="email" className="block text-[12.5px] font-bold mb-1.75 text-ink-deep">Email address <span className="font-medium text-muted-label">(optional)</span></label>
               <input id="email" type="email" autoComplete="email" placeholder="ada@email.com" enterKeyHint="next" value={email} onChange={(e) => setEmail(e.target.value)} className={fieldClass} />
+            </div>
+            <div className="mt-4">
+              <label htmlFor="address" className="block text-[12.5px] font-bold mb-1.75 text-ink-deep">Full address</label>
+              <textarea id="address" rows={2} autoComplete="street-address" placeholder="House number, street, area" value={address} onChange={(e) => setAddress(e.target.value)} className={`${fieldClass} resize-none`} />
+              {detailErrs.address && <div className="mt-2 text-[12.5px] font-semibold text-orange-deep">Please enter your address.</div>}
+            </div>
+            <div className="mt-4">
+              <label htmlFor="state" className="block text-[12.5px] font-bold mb-1.75 text-ink-deep">State of residence</label>
+              <select id="state" value={stateRes} onChange={(e) => setStateRes(e.target.value)} className={`${fieldClass} appearance-none ${stateRes ? '' : 'text-muted-label!'}`} style={selectArrowStyle}>
+                <option value="" disabled>Choose your state</option>
+                {NG_STATES.map((s) => <option key={s} value={s} className="text-ink">{s}</option>)}
+              </select>
+              {detailErrs.state && <div className="mt-2 text-[12.5px] font-semibold text-orange-deep">Please choose your state.</div>}
+            </div>
+            <div className="mt-4">
+              <label htmlFor="profession" className="block text-[12.5px] font-bold mb-1.75 text-ink-deep">Profession</label>
+              <input id="profession" type="text" autoComplete="organization-title" placeholder="e.g. Accountant, Student" enterKeyHint="next" value={profession} onChange={(e) => setProfession(e.target.value)} className={fieldClass} />
+              {detailErrs.profession && <div className="mt-2 text-[12.5px] font-semibold text-orange-deep">Please tell us your profession.</div>}
+            </div>
+            <div className="mt-4">
+              <label htmlFor="dob" className="block text-[12.5px] font-bold mb-1.75 text-ink-deep">Date of birth</label>
+              <input id="dob" type="date" autoComplete="bday" min="1900-01-01" max={todayISO()} value={dob} onChange={(e) => setDob(e.target.value)} className={`${fieldClass} min-h-13.5`} />
+              {detailErrs.dob && <div className="mt-2 text-[12.5px] font-semibold text-orange-deep">Please enter your date of birth.</div>}
             </div>
             <div className="mt-4">
               <label className="block text-[12.5px] font-bold mb-1.75 text-ink-deep">Is this your first time at Rig Church?</label>

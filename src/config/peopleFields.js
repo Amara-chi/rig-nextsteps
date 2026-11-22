@@ -1,4 +1,5 @@
-import { fmtDate, fmtPhone } from '../lib/format.js'
+import { fmtBirthday, fmtDate, fmtPhone } from '../lib/format.js'
+import { MONTHS } from './site.js'
 
 const yn = (v) => (v ? 'Yes' : 'No')
 
@@ -20,6 +21,10 @@ export const PEOPLE_FIELD_DEFS = [
   { key: 'email', label: 'Email', value: (p) => p.email || '' },
   { key: 'first_time', label: 'First time', value: (p) => yn(p.first_time) },
   { key: 'heard_about', label: 'How they heard', value: (p) => p.heard_about || '' },
+  { key: 'address', label: 'Address', value: (p) => p.address || '' },
+  { key: 'state', label: 'State of residence', value: (p) => p.state || '' },
+  { key: 'occupation', label: 'Profession', value: (p) => p.occupation || '' },
+  { key: 'dob', label: 'Date of birth', value: (p) => fmtBirthday(p, MONTHS) },
   { key: 'steps_done', label: 'Steps done', value: (p) => p.steps_done ?? 0 },
   { key: 'steps', label: 'Steps attended', value: (p) => (p.steps || []).join(', ') },
   // Dates go out as day-month-year, the way they read everywhere else in the
