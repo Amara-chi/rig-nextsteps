@@ -148,7 +148,7 @@ export const templateKeyOf = (name) => (/noshow|missed/i.test(name || '') ? 'nos
 // something they never received.
 export const ANNOUNCEMENT_DRAFT = {
   template: 'whatsapp_business_training_nov26',
-  image_url: 'https://nextsteps.rigchurchlagos.org/images/events/whatsapp-business-training-2026-11-29.jpg',
+  image_url: 'https://nextsteps.rigchurchlagos.org/images/events/whatsapp-business-training-2026-11-29-landscape.jpg',
   text: `Hello [Name], you're invited to a free WhatsApp Business training at Rig Church Lagos on Sunday 29 November, 12:00 PM to 2:00 PM. The details are on the flyer. Register with the button below.`,
 }
 
