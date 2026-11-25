@@ -134,8 +134,35 @@ export const MESSAGE_TEMPLATES = [
   { key: 'completed', name: 'Finished all 4', when: 'The Sunday someone completes their fourth step.', text: MSG_COMPLETED, approved: false },
   { key: 'noshow', name: 'Missed a Sunday', when: 'Monday morning, to anyone with 1 to 3 steps done who missed the Sunday before.', text: MSG_NOSHOW, approved: false },
 ]
-// Which of the three a sent message was, from its stored template name.
-export const templateKeyOf = (name) => (/noshow|missed/i.test(name || '') ? 'noshow' : /complete/i.test(name || '') ? 'completed' : 'attended')
+// Which kind a sent message was, from its stored template name: one of the
+// three automatic messages, or an announcement sent to everyone through
+// whatsapp-broadcast (any other approved template).
+export const templateKeyOf = (name) => (/noshow|missed/i.test(name || '') ? 'noshow' : /complete/i.test(name || '') ? 'completed' : /followup|attended/i.test(name || '') ? 'attended' : 'announcement')
+
+// The announcement the Send an announcement dialog starts from: the
+// WhatsApp Business training, 29 Nov 2026. These words must be submitted
+// to Meta as a MARKETING template under exactly this name, with the flyer
+// as an image header, {{1}} where [Name] is, and a "Register now" URL
+// button to the form; the dialog sends the template, and these words are
+// only what the chat shows. Edit both together, or the chat shows people
+// something they never received.
+export const ANNOUNCEMENT_DRAFT = {
+  template: 'whatsapp_business_training_nov26',
+  image_url: 'https://nextsteps.rigchurchlagos.org/images/events/whatsapp-business-training-2026-11-29.jpg',
+  text: `Hello [Name], you're invited to a free, hands-on WhatsApp Business training for small business owners at Rig Church Lagos, led by Meta Certified Trainers from Kuvora.
+
+You will learn:
+1. AI tools for business growth
+2. Setting up your catalogue and automated replies
+3. Running ads directly on WhatsApp Business
+
+You take home a Digital Starter Pack and an e-certificate.
+
+Date: Sunday 29 November 2026, 12:00 PM to 2:00 PM
+Venue: Rig Church Lagos, Commerce House, 1 Idowu Taylor Street, Victoria Island, Lagos
+
+It is open to all. Register with the button below. Enquiries: 0810 947 1009`,
+}
 
 export const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 export const AGE_RANGES = ['Under 20', '20 to 30', '30 to 40', '40 to 50', '50 and over']

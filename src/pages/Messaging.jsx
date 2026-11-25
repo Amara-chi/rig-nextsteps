@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react'
 import PageHead, { Breadcrumb } from '../components/PageHead.jsx'
 import Card, { CardHead } from '../components/Card.jsx'
+import Dialog from '../components/Dialog.jsx'
+import Field, { TextInput, Textarea } from '../components/Field.jsx'
 import Avatar from '../components/Avatar.jsx'
 import Badge from '../components/Badge.jsx'
 import BtnSm from '../components/BtnSm.jsx'
@@ -12,13 +14,95 @@ import { useAppToast } from '../context/ToastContext.jsx'
 import { supabase } from '../lib/supabaseClient.js'
 import { sendWhatsApp } from '../lib/whatsapp.js'
 import { fillMsg, fmtPhone, fmtTime, fmtWhen } from '../lib/format.js'
-import { MESSAGE_TEMPLATES, MSG_ATTENDED, MSG_COMPLETED, MSG_NOSHOW, templateKeyOf } from '../config/site.js'
+import { ANNOUNCEMENT_DRAFT, MESSAGE_TEMPLATES, MSG_ATTENDED, MSG_COMPLETED, MSG_NOSHOW, templateKeyOf } from '../config/site.js'
 
 const th = 'py-1.5 px-2 pb-2.5 font-semibold border-b border-[#ECE7DA] text-left'
 const td = 'py-2.75 px-2 border-b border-[#ECE7DA] align-middle'
 const STATUS = { read: ['Read', 'green'], delivered: ['Delivered', 'green'], sent: ['Sent', 'navy'], failed: ['Failed', 'orange'], queued: ['Queued', 'grey'] }
 const WINDOW_MS = 24 * 3600 * 1000
-const templateName = (k) => (MESSAGE_TEMPLATES.find((t) => t.key === k) || {}).name
+const templateName = (k) => (k === 'announcement' ? 'Announcement' : (MESSAGE_TEMPLATES.find((t) => t.key === k) || {}).name)
+
+// whatsapp-broadcast's errors live in the response body, not the generic
+// FunctionsHttpError (same reason lib/whatsapp.js exists).
+async function broadcast(body) {
+  const { data, error } = await supabase.functions.invoke('whatsapp-broadcast', { body })
+  if (error) {
+    let detail = ''
+    try { detail = (await error.context?.json())?.error } catch { /* generic line below */ }
+    return { ok: false, error: detail || "Couldn't reach the announcement sender. Is whatsapp-broadcast deployed?" }
+  }
+  return data?.ok === false ? { ok: false, error: data.error } : { ok: true, ...data }
+}
+
+// The admin sends one approved template to every Next Steps person with a
+// phone. Check first (a dry run: who gets it), then send, in batches the
+// function can finish in time, until nobody is left or a batch sends none.
+function AnnouncementDialog({ open, onClose, onSent }) {
+  const toast = useAppToast()
+  const [f, setF] = useState(ANNOUNCEMENT_DRAFT)
+  const [check, setCheck] = useState(null) // the dry run's report
+  const [busy, setBusy] = useState(false)
+  const [progress, setProgress] = useState(null) // { sent, failed, errors }
+  const set = (k) => (e) => { setF((x) => ({ ...x, [k]: e.target.value })); setCheck(null) }
+  const close = () => { if (busy) return; setCheck(null); setProgress(null); onClose() }
+  const payload = { template: f.template.trim(), display_text: f.text.trim(), image_url: f.image_url.trim() }
+
+  const runCheck = async () => {
+    setBusy(true); const r = await broadcast({ ...payload, dry: true }); setBusy(false)
+    if (!r.ok) { toast(r.error); return }
+    setCheck(r)
+  }
+  const send = async () => {
+    setBusy(true)
+    let sent = 0, failed = 0, errors = []
+    for (;;) {
+      const r = await broadcast(payload)
+      if (!r.ok) { toast(r.error); break }
+      sent += r.sent; failed += r.failed; errors = [...new Set([...errors, ...r.errors])]
+      setProgress({ sent, failed, errors })
+      if (!r.remaining || r.sent === 0) break
+    }
+    setBusy(false); setCheck(null); onSent?.()
+    toast(failed ? `Sent to ${sent}. ${failed} could not be sent; see below.` : `Sent to ${sent} people from the church number.`)
+  }
+
+  return (
+    <Dialog
+      open={open}
+      width={620}
+      onClose={close}
+      title="Send an announcement"
+      sub="One approved WhatsApp template, from the church number, to everyone who came through Next Steps and has a phone on file. Nobody gets it twice."
+      footer={<>
+        <BtnSm variant="outline" onClick={close} disabled={busy}>Close</BtnSm>
+        {check
+          ? <BtnSm disabled={busy || !check.remaining} onClick={send}>{busy ? 'Sending…' : `Send to ${check.remaining} ${check.remaining === 1 ? 'person' : 'people'}`}</BtnSm>
+          : <BtnSm disabled={busy} onClick={runCheck}>{busy ? 'Checking…' : 'Check who gets it'}</BtnSm>}
+      </>}
+    >
+      <div className="bg-amber-bg border border-amber-border text-amber-text rounded-xl py-3 px-3.5 text-[13px] leading-normal">
+        <strong>Meta must approve the template first.</strong> In WhatsApp Manager, submit it as a Marketing template with exactly this name, the image as its header, {'{{1}}'} where [Name] is, and a Register button. Sending before it is approved fails at the first person and stops.
+      </div>
+      <Field label="Template name (as approved)" htmlFor="an-name"><TextInput id="an-name" value={f.template} onChange={set('template')} /></Field>
+      <Field label="Header image link" htmlFor="an-img"><TextInput id="an-img" value={f.image_url} onChange={set('image_url')} /></Field>
+      <Field label={<>The approved words <span className="font-medium text-muted-label">(what the chat shows; [Name] becomes their first name)</span></>} htmlFor="an-text">
+        <Textarea id="an-text" rows={10} value={f.text} onChange={set('text')} />
+      </Field>
+      {check && (
+        <div className="mt-4 bg-row-hover rounded-xl py-3 px-3.5 text-[13px] leading-normal">
+          <strong>{check.remaining} {check.remaining === 1 ? 'person' : 'people'}</strong> will get it, of {check.total} Next Steps people with a phone{check.already ? ` (${check.already} already have it)` : ''}.
+          {check.names?.length > 0 && <div className="text-xs text-muted-body mt-1.5 max-h-28 overflow-y-auto">{check.names.join(', ')}</div>}
+        </div>
+      )}
+      {progress && (
+        <div className="mt-4 text-[13px] leading-normal">
+          Sent {progress.sent}{progress.failed ? `, ${progress.failed} failed` : ''}.
+          {progress.errors.map((e) => <div key={e} className="text-xs text-orange-deep mt-1">{e}</div>)}
+        </div>
+      )}
+    </Dialog>
+  )
+}
 
 // Messaging is the automatic WhatsApp line: what the church's own number
 // sent after Sunday, how WhatsApp says each one fared, and what people
@@ -32,6 +116,7 @@ export default function Messaging({ sent, inbound, queued, conversations, contac
   const [filter, setFilter] = useState('all')
   const [chat, setChat] = useState(null)
   const [sendingId, setSendingId] = useState(null)
+  const [announcing, setAnnouncing] = useState(false)
 
   const weekAgo = Date.now() - 7 * 86400000
   const week = sent.filter((m) => new Date(m.created_at).getTime() >= weekAgo)
@@ -74,7 +159,9 @@ export default function Messaging({ sent, inbound, queued, conversations, contac
         crumb={<Breadcrumb>Next Steps</Breadcrumb>}
         title="Messaging"
         sub="The WhatsApp messages the church's own number sends automatically after Sunday, and what people wrote back. No staff phone is involved here."
+        right={isDirector && <BtnSm onClick={() => setAnnouncing(true)}>Send an announcement</BtnSm>}
       />
+      <AnnouncementDialog open={announcing} onClose={() => setAnnouncing(false)} onSent={refresh} />
       <div className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(min(150px,100%),1fr))] mb-5.5">
         <Stat label="Sent this week" value={week.length} detail="From the church number" />
         <Stat label="Delivered" value={stat('delivered')} detail="WhatsApp confirmed" />
@@ -94,7 +181,7 @@ export default function Messaging({ sent, inbound, queued, conversations, contac
         <div className="flex flex-col gap-4.5">
           <Card>
             <CardHead title="What went out" sub="One row per automatic send, newest first. The status comes back from WhatsApp itself." right={
-              <Chips label="Filter by message" value={filter} onChange={setFilter} options={[['all', 'All'], ['attended', 'After a session'], ['completed', 'Finished all 4'], ['noshow', 'Missed a Sunday'], ['failed', 'Failed only']]} />
+              <Chips label="Filter by message" value={filter} onChange={setFilter} options={[['all', 'All'], ['attended', 'After a session'], ['completed', 'Finished all 4'], ['noshow', 'Missed a Sunday'], ['announcement', 'Announcements'], ['failed', 'Failed only']]} />
             } />
             <div className="overflow-x-auto">
               <table className="w-full border-collapse min-w-170">

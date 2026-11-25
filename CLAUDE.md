@@ -164,6 +164,16 @@ there is the reference for the sidebar and Follow Up pages, `TodayN.dc.html` for
   against `WHATSAPP_APP_SECRET` instead. It fails closed: no app secret configured means every
   POST is rejected, because the alternative is a public endpoint anyone can post fabricated
   newcomer messages into.
+- `supabase/functions/whatsapp-broadcast` — one Meta-approved MARKETING template (an event
+  invitation) from the church number to every `source = 'next_steps'` person with a phone,
+  logged in `whatsapp_messages` like the other sends. Director (or service key) only, called from
+  Messaging's "Send an announcement" dialog: a dry run first, then batches of 40 until nobody is
+  left. Idempotent per template name (a non-failed send is never repeated; failures retry), and
+  it stops at once on Meta's 132001 (template not approved / wrong name). The dialog starts from
+  `ANNOUNCEMENT_DRAFT` in `site.js`, whose words must match the approved template. Header images
+  are served from `public/images/events/`. Messaging labels any template that is not one of the
+  three automatic ones as an Announcement (`templateKeyOf`). Added 25 Nov 2026 for the WhatsApp
+  Business training.
 - `supabase/functions/manage-staff` — powers the Team pane (director-only): invite, remove, or
   re-role staff without hand-running SQL. **Invites create the account with a generated
   password and email it with the sign-in link through the church's SMTP** (org decision,
