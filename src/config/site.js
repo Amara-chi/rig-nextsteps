@@ -149,19 +149,7 @@ export const templateKeyOf = (name) => (/noshow|missed/i.test(name || '') ? 'nos
 export const ANNOUNCEMENT_DRAFT = {
   template: 'whatsapp_business_training_nov26',
   image_url: 'https://nextsteps.rigchurchlagos.org/images/events/whatsapp-business-training-2026-11-29.jpg',
-  text: `Hello [Name], you're invited to a free, hands-on WhatsApp Business training for small business owners at Rig Church Lagos, led by Meta Certified Trainers from Kuvora.
-
-You will learn:
-1. AI tools for business growth
-2. Setting up your catalogue and automated replies
-3. Running ads directly on WhatsApp Business
-
-You take home a Digital Starter Pack and an e-certificate.
-
-Date: Sunday 29 November 2026, 12:00 PM to 2:00 PM
-Venue: Rig Church Lagos, Commerce House, 1 Idowu Taylor Street, Victoria Island, Lagos
-
-It is open to all. Register with the button below. Enquiries: 0810 947 1009`,
+  text: `Hello [Name], you're invited to a free WhatsApp Business training at Rig Church Lagos on Sunday 29 November, 12:00 PM to 2:00 PM. The details are on the flyer. Register with the button below.`,
 }
 
 export const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
