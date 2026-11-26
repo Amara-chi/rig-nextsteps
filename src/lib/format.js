@@ -44,3 +44,11 @@ export const fmtWhen = (ts) => {
   if (days === 1) return 'yesterday'
   return d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
 }
+
+// whatsapp-webhook stores a message it has no text for (a sticker, photo,
+// voice note) as "[sticker message]" and so on; say it in words instead.
+const MEDIA_WORDS = { sticker: 'a sticker', image: 'a photo', audio: 'a voice note', video: 'a video', document: 'a document', location: 'a location', contacts: 'a contact card', reaction: 'a reaction' }
+export const replyText = (b) => {
+  const m = /^\[(\w+) message\]$/.exec(b || '')
+  return m ? `Sent ${MEDIA_WORDS[m[1]] || 'something the app cannot show'} (not shown in the app)` : b
+}

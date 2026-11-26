@@ -13,7 +13,7 @@ import { useMe } from '../context/MeContext.jsx'
 import { useAppToast } from '../context/ToastContext.jsx'
 import { supabase } from '../lib/supabaseClient.js'
 import { sendWhatsApp } from '../lib/whatsapp.js'
-import { fillMsg, fmtPhone, fmtTime, fmtWhen } from '../lib/format.js'
+import { fillMsg, fmtPhone, fmtTime, fmtWhen, replyText } from '../lib/format.js'
 import { ANNOUNCEMENT_DRAFT, MESSAGE_TEMPLATES, MSG_ATTENDED, MSG_COMPLETED, MSG_NOSHOW, templateKeyOf } from '../config/site.js'
 
 const th = 'py-1.5 px-2 pb-2.5 font-semibold border-b border-[#ECE7DA] text-left'
@@ -39,13 +39,14 @@ async function broadcast(body) {
 // function can finish in time, until nobody is left or a batch sends none.
 function AnnouncementDialog({ open, onClose, onSent }) {
   const toast = useAppToast()
-  const [f, setF] = useState(ANNOUNCEMENT_DRAFT)
+  const [f, setF] = useState({ ...ANNOUNCEMENT_DRAFT, phone: '', name: '' })
   const [check, setCheck] = useState(null) // the dry run's report
   const [busy, setBusy] = useState(false)
   const [progress, setProgress] = useState(null) // { sent, failed, errors }
   const set = (k) => (e) => { setF((x) => ({ ...x, [k]: e.target.value })); setCheck(null) }
   const close = () => { if (busy) return; setCheck(null); setProgress(null); onClose() }
-  const payload = { template: f.template.trim(), display_text: f.text.trim(), image_url: f.image_url.trim() }
+  const one = f.phone.trim()
+  const payload = { template: f.template.trim(), display_text: f.text.trim(), image_url: f.image_url.trim(), ...(one ? { phone: one, name: f.name.trim() } : {}) }
 
   const runCheck = async () => {
     setBusy(true); const r = await broadcast({ ...payload, dry: true }); setBusy(false)
@@ -60,7 +61,7 @@ function AnnouncementDialog({ open, onClose, onSent }) {
       if (!r.ok) { toast(r.error); break }
       sent += r.sent; failed += r.failed; errors = [...new Set([...errors, ...r.errors])]
       setProgress({ sent, failed, errors })
-      if (!r.remaining || r.sent === 0) break
+      if (one || !r.remaining || r.sent === 0) break
     }
     setBusy(false); setCheck(null); onSent?.()
     toast(failed ? `Sent to ${sent}. ${failed} could not be sent; see below.` : `Sent to ${sent} people from the church number.`)
@@ -83,6 +84,10 @@ function AnnouncementDialog({ open, onClose, onSent }) {
       <div className="bg-amber-bg border border-amber-border text-amber-text rounded-xl py-3 px-3.5 text-[13px] leading-normal">
         <strong>Meta must approve the template first.</strong> In WhatsApp Manager, submit it as a Marketing template with exactly this name, the image as its header, {'{{1}}'} where [Name] is, and a Register button. Sending before it is approved fails at the first person and stops.
       </div>
+      <Field label={<>Send to one number only <span className="font-medium text-muted-label">(optional; leave empty to send to everyone)</span></>} htmlFor="an-phone">
+        <TextInput id="an-phone" inputMode="tel" placeholder="e.g. 0902 685 2855" value={f.phone} onChange={set('phone')} />
+      </Field>
+      {one && <Field label={<>Their first name <span className="font-medium text-muted-label">(only used if the number is not on file)</span></>} htmlFor="an-oname"><TextInput id="an-oname" value={f.name} onChange={set('name')} /></Field>}
       <Field label="Template name (as approved)" htmlFor="an-name"><TextInput id="an-name" value={f.template} onChange={set('template')} /></Field>
       <Field label="Header image link" htmlFor="an-img"><TextInput id="an-img" value={f.image_url} onChange={set('image_url')} /></Field>
       <Field label={<>The approved words <span className="font-medium text-muted-label">(what the chat shows; [Name] becomes their first name)</span></>} htmlFor="an-text">
@@ -90,8 +95,10 @@ function AnnouncementDialog({ open, onClose, onSent }) {
       </Field>
       {check && (
         <div className="mt-4 bg-row-hover rounded-xl py-3 px-3.5 text-[13px] leading-normal">
-          <strong>{check.remaining} {check.remaining === 1 ? 'person' : 'people'}</strong> will get it, of {check.total} Next Steps people with a phone{check.already ? ` (${check.already} already have it)` : ''}.
-          {check.names?.length > 0 && <div className="text-xs text-muted-body mt-1.5 max-h-28 overflow-y-auto">{check.names.join(', ')}</div>}
+          {check.one
+            ? <><strong>{check.names?.[0] || 'This number'}</strong> will get it{check.already ? ' again (they already have it)' : ''}.</>
+            : <><strong>{check.remaining} {check.remaining === 1 ? 'person' : 'people'}</strong> will get it, of {check.total} Next Steps people with a phone{check.already ? ` (${check.already} already have it)` : ''}.</>}
+          {!check.one && check.names?.length > 0 && <div className="text-xs text-muted-body mt-1.5 max-h-28 overflow-y-auto">{check.names.join(', ')}</div>}
         </div>
       )}
       {progress && (
@@ -125,7 +132,20 @@ export default function Messaging({ sent, inbound, queued, conversations, contac
   const handed = useMemo(() => new Set(contacts.filter((c) => c.handed_over_at || c.reason === 'failed').map((c) => c.id)), [contacts])
   // Replies lists only people who actually wrote back; a conversation that is
   // only our own automatic message has nothing to answer or pass over.
-  const replies = conversations.filter((c) => c.last_in_at)
+  // With a message picked in the filter, Replies narrows to the people who
+  // wrote back AFTER being sent that message, so an announcement's replies
+  // aren't buried under older conversations. Their own latest words show,
+  // not ours.
+  const matches = (key) => filter === 'all' || filter === 'failed' || key === filter
+  const firstSent = useMemo(() => {
+    const m = new Map()
+    for (const x of sent) if (x.template_name && x.person_id && x.status !== 'failed' && matches(templateKeyOf(x.template_name))) {
+      const t = new Date(x.created_at).getTime(); if (!m.has(x.person_id) || t < m.get(x.person_id)) m.set(x.person_id, t)
+    }
+    return m
+  }, [sent, filter]) // eslint-disable-line react-hooks/exhaustive-deps
+  const lastReply = (c, after = 0) => inbound.find((i) => (c.person_id ? i.person_id === c.person_id : i.phone === c.phone) && new Date(i.created_at).getTime() > after)
+  const replies = conversations.filter((c) => c.last_in_at && (filter === 'all' || filter === 'failed' || (c.person_id && firstSent.has(c.person_id) && lastReply(c, firstSent.get(c.person_id)))))
   const repliedAfter = (m) => inbound.some((i) => i.person_id && i.person_id === m.person_id && new Date(i.created_at) > new Date(m.created_at))
 
   const rows = [
@@ -177,12 +197,16 @@ export default function Messaging({ sent, inbound, queued, conversations, contac
         ))}
       </div>
 
+      <div className="mb-4">
+        <Chips label="Filter by message" value={tab === 'replies' && filter === 'failed' ? 'all' : filter} onChange={setFilter}
+          options={[['all', 'All'], ['attended', 'After a session'], ['completed', 'Finished all 4'], ['noshow', 'Missed a Sunday'], ['announcement', 'Announcements'], ...(tab === 'sent' ? [['failed', 'Failed only']] : [])]} />
+        {tab === 'replies' && filter !== 'all' && filter !== 'failed' && <div className="text-xs text-muted-sub mt-2">Showing only people who wrote back after we sent them this message.</div>}
+      </div>
+
       {tab === 'sent' && (
         <div className="flex flex-col gap-4.5">
           <Card>
-            <CardHead title="What went out" sub="One row per automatic send, newest first. The status comes back from WhatsApp itself." right={
-              <Chips label="Filter by message" value={filter} onChange={setFilter} options={[['all', 'All'], ['attended', 'After a session'], ['completed', 'Finished all 4'], ['noshow', 'Missed a Sunday'], ['announcement', 'Announcements'], ['failed', 'Failed only']]} />
-            } />
+            <CardHead title="What went out" sub="One row per automatic send, newest first. The status comes back from WhatsApp itself." />
             <div className="overflow-x-auto">
               <table className="w-full border-collapse min-w-170">
                 <thead><tr className="font-mono text-[9.5px] tracking-widest uppercase text-muted-label">
@@ -258,8 +282,8 @@ export default function Messaging({ sent, inbound, queued, conversations, contac
                     <span className="font-mono text-[11px] text-muted-body">{fmtPhone(c.phone)}</span>
                     {!c.person_id && <Badge variant="navy">Not on file</Badge>}
                   </div>
-                  <div className={`text-[13px] mt-0.75 leading-snug ${unread ? 'text-ink font-semibold' : 'text-muted-body'}`}>{c.last_direction === 'out' ? 'Church: ' : ''}“{c.last_body || ''}”</div>
-                  <div className="font-mono text-[10.5px] text-muted-label mt-0.75">{fmtWhen(c.last_at)}, {fmtTime(c.last_at)}</div>
+                  <div className={`text-[13px] mt-0.75 leading-snug ${unread ? 'text-ink font-semibold' : 'text-muted-body'}`}>{(() => { const r = lastReply(c); return r ? <>“{replyText(r.body)}”</> : <>{c.last_direction === 'out' ? 'Church: ' : ''}“{replyText(c.last_body || '')}”</> })()}</div>
+                  <div className="font-mono text-[10.5px] text-muted-label mt-0.75">Wrote {fmtWhen(c.last_in_at)}, {fmtTime(c.last_in_at)}</div>
                 </div>
                 <Badge variant={left > 0 ? 'green' : 'grey'}>{left > 0 ? `Can reply for ${left}h` : 'Window closed: template only'}</Badge>
                 <div className="flex gap-1.5">
@@ -270,7 +294,7 @@ export default function Messaging({ sent, inbound, queued, conversations, contac
               </div>
             )
           })}
-          {!replies.length && <EmptyState>Nobody has written back yet.</EmptyState>}
+          {!replies.length && <EmptyState>{filter === 'all' || filter === 'failed' ? 'Nobody has written back yet.' : 'Nobody has written back to this message yet.'}</EmptyState>}
         </Card>
       )}
 

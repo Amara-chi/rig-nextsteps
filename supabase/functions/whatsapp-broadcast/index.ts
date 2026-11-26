@@ -32,7 +32,11 @@
 // Deploy with JWT verification ON (the default):
 //   supabase functions deploy whatsapp-broadcast
 //
-// POST { template, display_text, image_url?, language?, dry?, limit? }
+// One number by hand: pass `phone` (and optionally `name` for someone not on
+// file). That sends to that number alone, from any source, even if they
+// already have it: the admin asked for it.
+//
+// POST { template, display_text, image_url?, language?, dry?, limit?, phone?, name? }
 //   template      - the approved template's name, exactly as in WhatsApp Manager
 //   display_text  - the approved body words, [Name] where {{1}} is
 //   image_url     - public link to the header image, if the template has one
@@ -87,24 +91,46 @@ Deno.serve(async (req) => {
   if (!displayText) return json({ ok: false, error: "Paste the template's words so the chat can show what was sent." }, 400);
   if (imageUrl && !/^https:\/\//.test(imageUrl)) return json({ ok: false, error: "The image link must start with https://" }, 400);
 
-  // Everyone from Next Steps with a phone.
-  const { data: people, error } = await admin
-    .from("people").select("id, full_name, phone")
-    .eq("source", "next_steps").not("phone", "is", null)
-    .order("full_name");
-  if (error) return json({ ok: false, error: error.message }, 500);
+  // One number only: the admin asked for this person by hand, so it goes
+  // whether or not they are from Next Steps or already have it. Same
+  // normalising as norm_phone() / normPhoneJS().
+  const oneDigits = String(body?.phone ?? "").replace(/\D/g, "");
+  const one = /^0\d{10}$/.test(oneDigits) ? "234" + oneDigits.slice(1) : oneDigits;
+  if (body?.phone && one.length < 10) return json({ ok: false, error: "That phone number looks too short." }, 400);
 
-  // Who already has this announcement (anything but a failure counts).
-  const { data: done } = await admin
-    .from("whatsapp_messages").select("person_id")
-    .eq("direction", "out").eq("template_name", template).neq("status", "failed");
-  const already = new Set((done ?? []).map((r) => r.person_id));
-  const todo = (people ?? []).filter((p) => !already.has(p.id));
+  let people: { id: string | null; full_name: string | null; phone: string }[] = [];
+  let todo: typeof people = [];
+  let alreadyCount = 0;
+  if (one) {
+    const { data: p } = await admin.from("people").select("id, full_name, phone").eq("phone", one).maybeSingle();
+    const name = String(body?.name ?? "").trim();
+    people = [p ?? { id: null, full_name: name || null, phone: one }];
+    const { count } = await admin.from("whatsapp_messages").select("id", { count: "exact", head: true })
+      .eq("direction", "out").eq("template_name", template).eq("phone", one).neq("status", "failed");
+    alreadyCount = count ?? 0;
+    todo = people;
+  } else {
+    // Everyone from Next Steps with a phone.
+    const { data, error } = await admin
+      .from("people").select("id, full_name, phone")
+      .eq("source", "next_steps").not("phone", "is", null)
+      .order("full_name");
+    if (error) return json({ ok: false, error: error.message }, 500);
+    people = data ?? [];
+
+    // Who already has this announcement (anything but a failure counts).
+    const { data: done } = await admin
+      .from("whatsapp_messages").select("person_id")
+      .eq("direction", "out").eq("template_name", template).neq("status", "failed");
+    const already = new Set((done ?? []).map((r) => r.person_id));
+    alreadyCount = already.size;
+    todo = people.filter((p) => !already.has(p.id));
+  }
 
   const report = {
-    dry, template, total: (people ?? []).length, already: already.size,
+    dry, template, total: people.length, already: alreadyCount, one: one || undefined,
     sent: 0, failed: 0, errors: [] as string[], remaining: todo.length,
-    names: dry ? todo.map((p) => p.full_name) : undefined,
+    names: dry ? todo.map((p) => p.full_name ?? "Not on file") : undefined,
   };
   if (dry) return json({ ok: true, ...report });
 

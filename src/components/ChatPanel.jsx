@@ -6,7 +6,7 @@ import { useAppToast } from '../context/ToastContext.jsx'
 import { supabase } from '../lib/supabaseClient.js'
 import { sendWhatsApp } from '../lib/whatsapp.js'
 import { usePolling } from '../hooks/usePolling.js'
-import { fillMsg, fmtPhone, fmtTime } from '../lib/format.js'
+import { fillMsg, fmtPhone, fmtTime, replyText } from '../lib/format.js'
 import { MSG_ATTENDED, MSG_COMPLETED } from '../config/site.js'
 
 // WhatsApp only allows free-form business messages within 24 hours of the
@@ -110,7 +110,7 @@ export default function ChatPanel({ person, completed = false, onClose, onSent, 
                   ? 'bg-orange text-white rounded-br-[4px]'
                   : 'bg-white text-ink border border-line rounded-bl-[4px]'
               }`}>
-                <div className="whitespace-pre-wrap">{m.body}</div>
+                <div className="whitespace-pre-wrap">{replyText(m.body)}</div>
                 <div className={`font-mono text-[10px] mt-1 ${m.direction === 'out' ? 'text-white/70' : 'text-muted-label'}`}>
                   {fmtTime(m.created_at)}
                   {m.direction === 'out' && m.status ? ` · ${m.status}` : ''}

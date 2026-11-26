@@ -23,7 +23,7 @@ export function useMessaging(me) {
         .select('id, person_id, phone, template_name, body, status, error, created_at, people(full_name, source)')
         .eq('direction', 'out').gte('created_at', since).order('created_at', { ascending: false }).limit(400),
       supabase.from('whatsapp_messages')
-        .select('person_id, created_at').eq('direction', 'in').gte('created_at', since).limit(1000),
+        .select('person_id, phone, body, created_at').eq('direction', 'in').gte('created_at', since).order('created_at', { ascending: false }).limit(1000),
       supabase.from('followups')
         .select('id, type, created_at, checkins(step), people(id, full_name, phone)')
         .eq('status', 'pending').order('created_at', { ascending: false }).limit(60),
